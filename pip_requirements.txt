@@ -31,7 +31,7 @@ appdirs==1.4.4
 argcomplete==3.1.4
 attrs==23.2.0
 auv-custom-interfaces==0.0.0
--e git+https://github.com/bernardo-anomalous/MobulaAUVWorkspace.git@f7b891c8f14b9b997ef93c88b36befb7776b4b74#egg=auv_pkg&subdirectory=build/auv_pkg
+-e git+ssh://git@github.com/bernardo-anomalous/MobulaAUVWorkspace.git@d7bcefbcc6241a2f189aad8fbc6c05f7ac5f30aa#egg=auv_pkg&subdirectory=build/auv_pkg
 Babel==2.10.3
 bcrypt==3.2.2
 beautifulsoup4==4.12.3
