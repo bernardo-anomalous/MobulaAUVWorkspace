@@ -55,7 +55,7 @@ class IMUNode(Node):
             if self.sensor_ready_mode == 'alive':
                 return True
             elif self.sensor_ready_mode == 'stable':
-                return status in ["Stable", "Stationary", "On Table"]
+                return status in ["Stable", "Stationary", "On Table", "In motion"]
         return False
 
     def reset_sensor(self):
