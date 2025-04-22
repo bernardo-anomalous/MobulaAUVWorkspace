@@ -1,0 +1,246 @@
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float32MultiArray
+from auv_custom_interfaces.msg import ServoMovementCommand
+from rclpy.timer import Timer
+import math
+
+class ServoInterpolationNodeV3(Node):
+    def __init__(self):
+        super().__init__('servo_interpolation_node_v3')
+        self.get_logger().info('Initializing Servo Interpolation Node V3')
+
+        # Configurable parameters
+        self.declare_parameter('interpolation_density', 10)  # Default to 10 intermediate points
+        self.declare_parameter('update_rate_hz', 70)  # Default to 50 updates per second
+        self.declare_parameter('cross_fade_factor', 0.5)  # Default cross-fade factor (50%)
+
+        self.interpolation_density = self.get_parameter('interpolation_density').value
+        self.update_rate_hz = self.get_parameter('update_rate_hz').value
+        self.cross_fade_factor = self.get_parameter('cross_fade_factor').value
+
+        # Publisher to send interpolated commands to the servo driver node
+        self.publisher = self.create_publisher(ServoMovementCommand, 'servo_driver_commands', 10)
+
+        # Subscriber to receive high-level movement commands
+        self.command_subscriber = self.create_subscription(
+            ServoMovementCommand,
+            'servo_interpolation_commands',
+            self.command_callback,
+            10)
+
+        # Subscriber to receive current servo angles
+        self.current_angles_subscriber = self.create_subscription(
+            Float32MultiArray,
+            'current_servo_angles',
+            self.current_angles_callback,
+            10)
+
+        # Timer for publishing intermediate commands
+        self.timer = None
+        self.steps = []
+        self.current_step_index = 0
+        self.current_angles = [0.0] * 4  # Assuming 4 servos: left_main, left_pitch, right_main, right_pitch
+        self.movement_type = ''
+        self.initial_angles_set = False
+
+    def current_angles_callback(self, msg):
+        if len(msg.data) >= len(self.current_angles):
+            self.current_angles = msg.data[:len(self.current_angles)]
+            self.initial_angles_set = True
+            self.get_logger().info(f'Received current servo angles: {self.current_angles}')
+
+    def command_callback(self, msg):
+        # Validate incoming command data
+        self.get_logger().info(f'Received command: servo_numbers={msg.servo_numbers}, target_angles={msg.target_angles}, durations={msg.durations}, movement_type={msg.movement_type}, operational_mode={msg.operational_mode}')
+
+        # Ensure initial angles are set before proceeding
+        if not self.initial_angles_set:
+            self.get_logger().warn('Current servo angles not yet received. Ignoring command.')
+            return
+
+        # Extract command data
+        servo_numbers = msg.servo_numbers
+        target_angles = msg.target_angles
+        durations = msg.durations
+        easing_algorithms = msg.easing_algorithms
+        easing_in_factors = msg.easing_in_factors
+        easing_out_factors = msg.easing_out_factors
+        self.movement_type = msg.movement_type
+
+        # Process each movement step and create continuous stream with cross-fade
+        start_angles = [self.current_angles[j] for j in servo_numbers]
+        for i in range(len(durations)):
+            end_angles = target_angles[i * len(servo_numbers):(i + 1) * len(servo_numbers)]
+            duration = durations[i]
+            easing_algorithm = easing_algorithms[i] if i < len(easing_algorithms) else 'linear'
+            easing_in_factor = easing_in_factors[i] if i < len(easing_in_factors) else 0.0
+            easing_out_factor = easing_out_factors[i] if i < len(easing_out_factors) else 0.0
+
+            # Calculate number of steps based on update rate and duration
+            num_steps = max(int(duration * self.update_rate_hz), 2)  # Ensure at least 2 steps for meaningful interpolation
+            steps = self.calculate_interpolation(start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor)
+
+            # Apply cross-fade to overlap the next movement
+            cross_fade_steps = min(int(self.cross_fade_factor * num_steps), len(steps), len(self.steps))
+            if len(self.steps) > 0 and cross_fade_steps > 0:
+                for j in range(cross_fade_steps):
+                    blend_factor = (j + 1) / cross_fade_steps
+                    blended_angles = [
+                        (1 - blend_factor) * self.steps[-cross_fade_steps + j]['angles'][k] + blend_factor * steps[j]['angles'][k]
+                        for k in range(len(servo_numbers))
+                    ]
+                    self.steps[-cross_fade_steps + j]['angles'] = blended_angles
+
+            # Append all the new steps to the queue
+            self.steps.extend(steps[cross_fade_steps:])
+
+            # Update start_angles for the next step in the sequence
+            start_angles = end_angles
+
+        # Add the final step to return pitch servos to neutral position with blending if movement type is 'thrust_unit'
+        if self.movement_type == 'thrust_unit':
+            # Ensure the first two movements are fully blended
+            if len(durations) > 1:
+                initial_correction_angles = [90.0 if idx % 2 == 1 else start_angles[idx] for idx in range(len(start_angles))]
+                initial_correction_duration = durations[0]
+                num_steps = max(int(initial_correction_duration * self.update_rate_hz), 2)
+                steps = self.calculate_interpolation(start_angles, initial_correction_angles, initial_correction_duration, num_steps, 'linear', 0.0, 1.0)
+
+                # Apply full blending for the first two movements (start at the same time)
+                cross_fade_steps = len(steps)  # Cross-fade factor of 1 for full blending
+                for j in range(cross_fade_steps):
+                    blend_factor = (j + 1) / cross_fade_steps
+                    blended_angles = [
+                        (1 - blend_factor) * start_angles[k] + blend_factor * initial_correction_angles[k]
+                        for k in range(len(initial_correction_angles))
+                    ]
+                    self.steps.append({'angles': blended_angles, 'duration': initial_correction_duration / cross_fade_steps})
+
+            # Neutral position correction
+            neutral_angles = [90.0 if idx % 2 == 1 else start_angles[idx] for idx in range(len(start_angles))]
+            neutral_duration = durations[-1]  # Use the duration of the last movement
+            num_steps = max(int(neutral_duration * self.update_rate_hz), 2)
+            steps = self.calculate_interpolation(start_angles, neutral_angles, neutral_duration, num_steps, 'linear', 0.0, 1.0)
+            
+            # Ensure the pitch correction is fully blended with the previous swing
+            cross_fade_steps = len(steps)  # Cross-fade factor of 1 for full blending
+            if len(self.steps) > 0 and cross_fade_steps > 0:
+                for j in range(cross_fade_steps):
+                    blend_factor = (j + 1) / cross_fade_steps
+                    blended_angles = [
+                        (1 - blend_factor) * self.steps[-cross_fade_steps + j]['angles'][k] + blend_factor * steps[j]['angles'][k]
+                        for k in range(len(neutral_angles))
+                    ]
+                    self.steps[-cross_fade_steps + j]['angles'] = blended_angles
+            
+            # Append the remaining steps for neutral position correction
+            self.steps.extend(steps[cross_fade_steps:])
+
+        # Create a timer to publish each intermediate step if not already created
+        if self.timer is None:
+            self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
+
+    def calculate_interpolation(self, start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor):
+        # Generate interpolated steps based on the specified easing algorithm
+        steps = []
+
+        for step in range(num_steps):
+            t = step / (num_steps - 1)
+            # Apply easing factors
+            t = self.apply_easing_factors(t, easing_in_factor, easing_out_factor)
+
+            if easing_algorithm == 'cubic':
+                t = self.cubic_ease_in_out(t)
+            elif easing_algorithm == 'exponential':
+                t = self.exponential_ease_out(t)
+            intermediate_angles = [
+                start + (end - start) * t
+                for start, end in zip(start_angles, end_angles)
+            ]
+            steps.append({'angles': intermediate_angles, 'duration': duration / num_steps})
+
+        return steps
+
+    def apply_easing_factors(self, t, easing_in_factor, easing_out_factor):
+        # Modify t based on easing in and out factors
+        if t < easing_in_factor:
+            return t * (1 / easing_in_factor)  # Speed up initial part
+        elif t > 1 - easing_out_factor:
+            return 1 - (1 - t) * (1 / easing_out_factor)  # Slow down final part
+        else:
+            return t
+
+    def cubic_ease_in_out(self, t):
+        # Cubic ease-in-out easing function
+        if t < 0.5:
+            return 4 * t * t * t
+        else:
+            return 1 - math.pow(-2 * t + 2, 3) / 2
+
+    def exponential_ease_out(self, t):
+        # Exponential ease-out easing function
+        return 1 - math.pow(2, -10 * t) if t != 1 else 1
+
+    def publish_next_step(self):
+        if self.current_step_index >= len(self.steps):
+            # End of sequence, stop timer and reset state
+            if self.timer:
+                self.timer.cancel()
+            self.timer = None
+            self.steps = []
+            self.current_step_index = 0
+            self.publish_end_command()
+            return
+
+        step = self.steps[self.current_step_index]
+
+        command = ServoMovementCommand()
+        command.header.stamp = self.get_clock().now().to_msg()
+        command.servo_numbers = list(range(len(step['angles'])))
+        command.target_angles = step['angles']
+        command.durations = [step['duration']] * len(step['angles'])
+        command.easing_algorithms = ['linear'] * len(step['angles'])  # Easing already applied in interpolation
+        command.easing_in_factors = [0.0] * len(step['angles'])
+        command.easing_out_factors = [0.0] * len(step['angles'])
+        command.movement_type = self.movement_type
+        command.deadline = (self.get_clock().now() + rclpy.duration.Duration(seconds=10)).to_msg()
+        command.operational_mode = 'energy_efficient'
+        command.priority = 0
+
+        # Publish the command for the current step
+        self.publisher.publish(command)
+        self.current_step_index += 1
+
+        # Update current_angles with the most recent command to maintain continuity
+        self.current_angles = step['angles']
+
+    def publish_end_command(self):
+        # Publish the final message with " + end" to indicate the end of the movement sequence
+        command = ServoMovementCommand()
+        command.header.stamp = self.get_clock().now().to_msg()
+        command.servo_numbers = list(range(len(self.current_angles)))
+        command.target_angles = self.current_angles
+        command.durations = [0.1] * len(self.current_angles)  # Short duration for the final command
+        command.easing_algorithms = ['linear'] * len(self.current_angles)
+        command.easing_in_factors = [0.0] * len(self.current_angles)
+        command.easing_out_factors = [0.0] * len(self.current_angles)
+        command.movement_type = f'{self.movement_type} + end'
+        command.deadline = (self.get_clock().now() + rclpy.duration.Duration(seconds=10)).to_msg()
+        command.operational_mode = 'energy_efficient'
+        command.priority = 0
+
+        self.publisher.publish(command)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ServoInterpolationNodeV3()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info('Keyboard interrupt, shutting down.')
+    finally:
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,32 @@
+from setuptools import find_packages, setup
+
+package_name = 'auv_pkg'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='b',
+    maintainer_email='b@todo.todo',
+    description='TODO: Package description',
+    license='TODO: License declaration',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            "keyboard_control = auv_pkg.keyboard_control:main",
+            "servo_interpolation = auv_pkg.servo_interpolation:main",
+            "servo_driver = auv_pkg.servo_driver:main",
+            "imu_node = auv_pkg.imu_node:main",
+            "pitch_pid = auv_pkg.pitch_pid:main",
+            "roll_pid = auv_pkg.roll_pid:main",
+            "camera_control = auv_pkg.camera_control:main"
+        ],
+    },
+)
