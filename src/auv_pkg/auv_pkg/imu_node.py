@@ -40,23 +40,53 @@ class IMUNode(Node):
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
             self.bno = BNO08X_I2C(i2c, address=0x4B)
-            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-            self.bno.enable_feature(BNO_REPORT_STABILITY_CLASSIFIER)
 
-            self.sensor_ready = False  # Wait for readiness check
+            # Retry enabling features up to 5 times
+            features = [
+                BNO_REPORT_ACCELEROMETER,
+                BNO_REPORT_GYROSCOPE,
+                BNO_REPORT_ROTATION_VECTOR,
+                BNO_REPORT_STABILITY_CLASSIFIER
+            ]
+            for feature in features:
+                success = False
+                for attempt in range(5):
+                    try:
+                        self.bno.enable_feature(feature)
+                        success = True
+                        break
+                    except Exception as e:
+                        self.get_logger().warn(f"Attempt {attempt+1} to enable feature {feature} failed: {e}")
+                if not success:
+                    raise RuntimeError(f"Could not enable feature {feature} after 5 attempts.")
+
+            self.sensor_ready = False  # Reset ready flag
+
         except Exception as e:
             self.get_logger().error(f"Error initializing sensor: {e}")
 
+
     def check_sensor_ready(self):
-        status = self.bno.stability_classification
+        try:
+            status = self.bno.stability_classification
+        except RuntimeError as e:
+            self.get_logger().warn(f"Stability classification not available yet: {e}")
+            return False
+        except KeyError as e:
+            self.get_logger().warn(f"Unknown report ID received (probably noise on the bus): {e}")
+            return False
+        except Exception as e:
+            self.get_logger().error(f"Unexpected error when checking sensor readiness: {e}")
+            return False
+
         if status is not None and status != "Unknown":
             if self.sensor_ready_mode == 'alive':
                 return True
             elif self.sensor_ready_mode == 'stable':
                 return status in ["Stable", "Stationary", "On Table", "In motion"]
         return False
+
+
 
     def reset_sensor(self):
         self.get_logger().info("Resetting BNO08X sensor...")

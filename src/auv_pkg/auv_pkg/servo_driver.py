@@ -14,6 +14,7 @@ class ServoDriverNode(LifecycleNode):
         super().__init__('servo_driver_node')
         self.get_logger().info('Servo Driver Node initialized.')
 
+
         # Declare ROS2 parameters for configuring the node
         self.declare_parameter('glide_position', [90.0, 90.0, 90.0, 90.0, 90.0, 90.0])  # Default glide position for all servos
         self.declare_parameter('update_rate_hz', 10.0)  # Update rate for publishing servo positions
