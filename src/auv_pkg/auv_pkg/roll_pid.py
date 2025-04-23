@@ -39,6 +39,7 @@ class WingRollController(Node):
 
         # Activation flag
         self.pid_active = True
+        self.last_pid_active_state = True
 
         # Publisher
         self.servo_publisher = self.create_publisher(ServoMovementCommand, 'servo_driver_commands', 10)
@@ -65,8 +66,14 @@ class WingRollController(Node):
 
     def update_pid(self):
         if not self.pid_active:
-            self.get_logger().info("PID controllers deactivated.")
+            if self.last_pid_active_state:
+                self.get_logger().info("Wing PID controllers deactivated.")
+                self.last_pid_active_state = False
             return
+        else:
+            if not self.last_pid_active_state:
+                self.get_logger().info("Wing PID controllers activated.")
+                self.last_pid_active_state = True
 
         # Time calculations
         current_time = self.get_clock().now()
@@ -105,10 +112,7 @@ class WingRollController(Node):
         command.durations = [0.033, 0.033]
         self.servo_publisher.publish(command)
 
-        # Logging
-        self.get_logger().info(f'Roll Error: {error_roll:.2f}')
-        self.get_logger().info(f'Left Wing Angle: {left_wing_angle:.2f}, Right Wing Angle: {right_wing_angle:.2f}')
-
+        
 
 def main(args=None):
     rclpy.init(args=args)

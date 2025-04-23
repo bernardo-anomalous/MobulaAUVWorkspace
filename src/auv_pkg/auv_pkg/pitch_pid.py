@@ -69,7 +69,7 @@ class TailPitchRollController(Node):
         self.create_subscription(Vector3, 'imu/euler', self.imu_callback, 10)
 
         # Timer for PID updates
-        self.timer = self.create_timer(0.033, self.update_pid)  # Update at ~30 Hz
+        self.timer = self.create_timer(0.05, self.update_pid)  # Update at ~30 Hz
 
         self.get_logger().info('Tail Pitch and Roll Controller Node Initialized')
 
@@ -140,8 +140,8 @@ class TailPitchRollController(Node):
         self.servo_publisher.publish(command)
 
         # Logging
-        self.get_logger().info(f'Pitch Error: {error_pitch:.2f}, Roll Error: {error_roll:.2f}')
-        self.get_logger().info(f'Left Tail Angle: {left_tail_angle:.2f}, Right Tail Angle: {right_tail_angle:.2f}')
+        #self.get_logger().info(f'Pitch Error: {error_pitch:.2f}, Roll Error: {error_roll:.2f}')
+        #self.get_logger().info(f'Left Tail Angle: {left_tail_angle:.2f}, Right Tail Angle: {right_tail_angle:.2f}')
 
 
 def main(args=None):
