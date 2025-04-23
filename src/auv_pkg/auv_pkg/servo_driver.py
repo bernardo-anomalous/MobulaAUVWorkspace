@@ -102,12 +102,24 @@ class ServoDriverNode(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
-        self.get_logger().info('Deactivating Servo Driver Node...')
+        self.get_logger().info('Deactivating Servo Driver Node... Attempting to limp servos.')
+
         # Stop the heartbeat timer if it is running
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
             self.heartbeat_timer = None
+
+        # Attempt to set duty cycle to 0 to "release" servos (if not in simulation)
+        if not self.simulation_mode and self.pca:
+            try:
+                for channel in self.pca.channels:
+                    channel.duty_cycle = 0  # This sends no PWM signal
+                self.get_logger().info('PWM signals stopped. Servos should be limp (if supported by model).')
+            except Exception as e:
+                self.get_logger().error(f'Error while setting duty cycles to 0: {e}')
+
         return TransitionCallbackReturn.SUCCESS
+
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Cleaning up Servo Driver Node...')
