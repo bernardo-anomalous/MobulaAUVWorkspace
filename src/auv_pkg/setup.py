@@ -26,6 +26,7 @@ setup(
             "imu_node = auv_pkg.imu_node:main",
             "pitch_pid = auv_pkg.pitch_pid:main",
             "roll_pid = auv_pkg.roll_pid:main",
+            "keyboard_control_swim = auv_pkg.keyboard_control_swim:main",
             "camera_control = auv_pkg.camera_control:main"
         ],
     },

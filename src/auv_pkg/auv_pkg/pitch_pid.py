@@ -125,8 +125,8 @@ class TailPitchRollController(Node):
         self.previous_correction_roll = correction_roll
 
         # Combine corrections for servos with reversed roll logic for left servo
-        left_tail_angle = 90.0 - (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)+ correction_roll  #change the + or + on both lines to correct the respective angle direction of response
-        right_tail_angle = 90.0 + (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0) + correction_roll
+        left_tail_angle = 90.0 + (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)+ correction_roll  #change the + or + on both lines to correct the respective angle direction of response
+        right_tail_angle = 90.0 - (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0) + correction_roll
 
         # Clamp servo angles
         left_tail_angle = max(self.min_angle, min(self.max_angle, left_tail_angle))

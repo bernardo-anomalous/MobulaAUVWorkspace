@@ -16,7 +16,7 @@ class ServoDriverNode(LifecycleNode):
 
 
         # Declare ROS2 parameters for configuring the node
-        self.declare_parameter('glide_position', [90.0, 90.0, 90.0, 90.0, 90.0, 90.0])  # Default glide position for all servos
+        self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 90.0, 90.0])  # Default glide position for all servos
         self.declare_parameter('update_rate_hz', 10.0)  # Update rate for publishing servo positions
         self.declare_parameter('simulation_mode', False)  # Simulation mode toggle
 

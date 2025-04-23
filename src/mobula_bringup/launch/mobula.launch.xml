@@ -1,11 +1,7 @@
 <launch>
-    <node pkg="auv_pkg" exec="servo_driver" respawn="true"/>
-    <node pkg="auv_pkg" exec="servo_interpolation" respawn="true"/>
-    <node pkg="auv_pkg" exec="imu_node" respawn="true"/>
-    <node pkg="auv_pkg" exec="pitch_pid" respawn="true"/>
-    <node pkg="auv_pkg" exec="roll_pid" respawn="true"/>
+    <node pkg="auv_pkg" exec="servo_driver" />
+    <node pkg="auv_pkg" exec="servo_interpolation" />
+    <node pkg="auv_pkg" exec="imu_node" />
+    <node pkg="auv_pkg" exec="pitch_pid" />
+    <node pkg="auv_pkg" exec="roll_pid" />
 </launch>
-
-
-
-
