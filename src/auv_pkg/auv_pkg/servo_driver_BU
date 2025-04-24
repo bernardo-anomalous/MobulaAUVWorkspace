@@ -28,6 +28,13 @@ class ServoDriverNode(LifecycleNode):
         self.command_subscriber = None
         self.tail_command_subscriber = None
         self.heartbeat_timer = None
+        self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
+        self.last_published_status = None  # Track last status string
+        self.last_published_status = None
+        self.executing_movement = False  # Flag for whether we're in a movement sequence
+
+
+
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Configuring Servo Driver Node...')
@@ -102,7 +109,24 @@ class ServoDriverNode(LifecycleNode):
     def _servo_command_callback(self, msg: ServoMovementCommand):
         if self.debug_logging:
             self.get_logger().info(f'Received command: {msg}')
+
         try:
+            movement_type = msg.movement_type.lower() if msg.movement_type else ""
+
+            if 'end' in movement_type:
+                self.executing_movement = False
+                self._publish_busy_status("nominal: roll and pitch pid engaged")
+            elif movement_type != 'pid_control':
+                if not self.executing_movement:
+                    # Only announce busy when we start a new sequence
+                    self.executing_movement = True
+                    self._publish_busy_status(f"busy: executing {msg.movement_type}")
+                # Stay busy — do not publish again if already in executing state
+            else:
+                if not self.executing_movement:
+                    self._publish_busy_status("nominal: roll and pitch pid engaged")
+
+            # === NORMAL SERVO EXECUTION ===
             if not self.simulation_mode:
                 for i, servo_number in enumerate(msg.servo_numbers):
                     if servo_number < len(self.current_angles) and servo_number in self.servos:
@@ -111,9 +135,14 @@ class ServoDriverNode(LifecycleNode):
             else:
                 for i, servo_number in enumerate(msg.servo_numbers):
                     self.current_angles[servo_number] = msg.target_angles[i]
+
             self._publish_current_servo_angles()
+
         except Exception as e:
             self.get_logger().error(f'Failed to execute command: {e}')
+
+
+
 
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
@@ -124,6 +153,17 @@ class ServoDriverNode(LifecycleNode):
         heartbeat_msg = String()
         heartbeat_msg.data = 'alive'
         self.angles_publisher.publish(heartbeat_msg)  # Optionally use a separate heartbeat topic
+        
+    def _publish_busy_status(self, status_message: str):
+        if status_message != self.last_published_status:
+            status_msg = String()
+            status_msg.data = status_message
+            self.busy_status_publisher.publish(status_msg)
+            self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
+            self.last_published_status = status_message  # Update last status
+
+
+
 
 
 def main(args=None):
