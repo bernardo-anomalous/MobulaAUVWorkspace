@@ -29,6 +29,11 @@ class ServoDriverNode(LifecycleNode):
         self.tail_command_subscriber = None
         self.heartbeat_timer = None
         self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
+        self.last_published_status = None  # Track last status string
+        self.last_published_status = None
+        self.executing_movement = False  # Flag for whether we're in a movement sequence
+
+
 
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
@@ -106,11 +111,20 @@ class ServoDriverNode(LifecycleNode):
             self.get_logger().info(f'Received command: {msg}')
 
         try:
-            # === PUBLISH BUSY STATUS ===
-            if 'end' in msg.movement_type:
-                self._publish_busy_status(False)  # Mark IDLE at the end of sequence
+            movement_type = msg.movement_type.lower() if msg.movement_type else ""
+
+            if 'end' in movement_type:
+                self.executing_movement = False
+                self._publish_busy_status("nominal: roll and pitch pid engaged")
+            elif movement_type != 'pid_control':
+                if not self.executing_movement:
+                    # Only announce busy when we start a new sequence
+                    self.executing_movement = True
+                    self._publish_busy_status(f"busy: executing {msg.movement_type}")
+                # Stay busy — do not publish again if already in executing state
             else:
-                self._publish_busy_status(True)   # Mark BUSY during normal commands
+                if not self.executing_movement:
+                    self._publish_busy_status("nominal: roll and pitch pid engaged")
 
             # === NORMAL SERVO EXECUTION ===
             if not self.simulation_mode:
@@ -128,6 +142,8 @@ class ServoDriverNode(LifecycleNode):
             self.get_logger().error(f'Failed to execute command: {e}')
 
 
+
+
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
         angles_msg.data = self.current_angles
@@ -138,11 +154,15 @@ class ServoDriverNode(LifecycleNode):
         heartbeat_msg.data = 'alive'
         self.angles_publisher.publish(heartbeat_msg)  # Optionally use a separate heartbeat topic
         
-    def _publish_busy_status(self, busy: bool):
-        status_msg = String()
-        status_msg.data = 'busy' if busy else 'idle'
-        self.busy_status_publisher.publish(status_msg)
-        self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
+    def _publish_busy_status(self, status_message: str):
+        if status_message != self.last_published_status:
+            status_msg = String()
+            status_msg.data = status_message
+            self.busy_status_publisher.publish(status_msg)
+            self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
+            self.last_published_status = status_message  # Update last status
+
+
 
 
 

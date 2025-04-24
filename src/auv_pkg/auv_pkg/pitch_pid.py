@@ -8,7 +8,7 @@ from auv_custom_interfaces.msg import ServoMovementCommand
 
 class TailPitchRollController(Node):
     def __init__(self):
-        super().__init__('tail_pitch_roll_controller')
+        super().__init__('Pitch_PID')
 
         # PID Coefficients for Pitch
         self.kp_pitch = 1.5
@@ -183,6 +183,7 @@ class TailPitchRollController(Node):
         command.servo_numbers = [4, 5]
         command.target_angles = [left_tail_angle, right_tail_angle]
         command.durations = [0.033, 0.033]
+        command.movement_type = "pid_control"
         self.servo_publisher.publish(command)
 
 

@@ -8,7 +8,7 @@ from auv_custom_interfaces.msg import ServoMovementCommand
 
 class WingRollController(Node):
     def __init__(self):
-        super().__init__('wing_roll_controller')
+        super().__init__('Roll_PID')
 
         # PID Coefficients for Roll
         self.kp_roll = 2.0  # Proportional gain
@@ -136,6 +136,7 @@ class WingRollController(Node):
         command.servo_numbers = [1, 3]
         command.target_angles = [left_wing_angle, right_wing_angle]
         command.durations = [0.033, 0.033]
+        command.movement_type = "pid_control"
         self.servo_publisher.publish(command)
 
 
