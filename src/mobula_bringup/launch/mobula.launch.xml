@@ -1,7 +1,12 @@
 <launch>
-    <node pkg="auv_pkg" exec="servo_driver" />
-    <node pkg="auv_pkg" exec="servo_interpolation" />
+    <!-- Start IMU Node FIRST (no delay) -->
     <node pkg="auv_pkg" exec="imu_node" />
-    <node pkg="auv_pkg" exec="pitch_pid" />
-    <node pkg="auv_pkg" exec="roll_pid" />
+
+    <!-- Delay Servo Driver by 5 seconds to give IMU time to initialize -->
+    <node pkg="auv_pkg" exec="servo_driver"/>
+
+    <!-- Interpolator and PIDs can start normally (or add slight delay if needed) -->
+    <node pkg="auv_pkg" exec="servo_interpolation"/>
+    <node pkg="auv_pkg" exec="pitch_pid"/>
+    <node pkg="auv_pkg" exec="roll_pid"/>
 </launch>

@@ -70,6 +70,13 @@ class TailPitchRollController(Node):
 
         # Timer for PID updates
         self.timer = self.create_timer(0.05, self.update_pid)  # Update at ~30 Hz
+        
+        self.last_imu_time = self.get_clock().now()
+        self.imu_timeout_sec = 1.0  # IMU considered stale after 1 second
+        self.recovery_factor = 0.0   # Starts at zero, ramps up to 1.0
+        self.recovery_rate = 0.05    # Ramp speed for recovery
+        self.imu_data_valid = False
+
 
         self.get_logger().info('Tail Pitch and Roll Controller Node Initialized')
 
@@ -80,21 +87,39 @@ class TailPitchRollController(Node):
         self.target_roll = msg.data
 
     def imu_callback(self, msg):
-        # Exponential smoothing filter to reduce IMU noise
+        # Exponential smoothing to reduce IMU noise
         self.current_pitch = self.alpha * self.current_pitch + (1 - self.alpha) * msg.y
         self.current_roll = self.alpha * self.current_roll + (1 - self.alpha) * msg.x
+        self.last_imu_time = self.get_clock().now()
+        self.imu_data_valid = True
 
     def update_pid(self):
+        now = self.get_clock().now()
+        time_since_last_imu = (now.nanoseconds - self.last_imu_time.nanoseconds) / 1e9
+
+        # Check IMU data freshness
+        if time_since_last_imu > self.imu_timeout_sec:
+            self.imu_data_valid = False
+            self.recovery_factor = 0.0  # Reset ramp-up
+            return  # Skip PID calculation if no valid data
+
+        if not self.imu_data_valid:
+            return  # Extra safety check
+
+        # Ramp-up recovery factor after IMU comes back
+        if self.recovery_factor < 1.0:
+            self.recovery_factor += self.recovery_rate
+            self.recovery_factor = min(self.recovery_factor, 1.0)
+
         # Time calculations
         current_time = self.get_clock().now()
         dt = (current_time.nanoseconds / 1e9)
-
         if dt <= 0:
             return
 
-        # Pitch PID
+        # === Pitch PID ===
         error_pitch = self.target_pitch - self.current_pitch
-        if abs(error_pitch) < 10.0:  # Overcompensation threshold for pitch
+        if abs(error_pitch) < 10.0:  # Overcompensation zone for pitch
             error_pitch *= self.overcompensation_factor_pitch
 
         proportional_pitch = self.kp_pitch * error_pitch
@@ -109,9 +134,8 @@ class TailPitchRollController(Node):
         correction_pitch = max(-self.correction_limit_pitch, min(self.correction_limit_pitch, correction_pitch))
         self.previous_correction_pitch = correction_pitch
 
-        # Roll PID
+        # === Roll PID (tail differential contribution) ===
         error_roll = self.target_roll - self.current_roll
-
         proportional_roll = self.kp_roll * error_roll
         self.integral_error_roll += error_roll * dt
         self.integral_error_roll = max(-self.integral_limit_roll, min(self.integral_limit_roll, self.integral_error_roll))
@@ -124,20 +148,45 @@ class TailPitchRollController(Node):
         correction_roll = max(-self.correction_limit_roll, min(self.correction_limit_roll, correction_roll))
         self.previous_correction_roll = correction_roll
 
-        # Combine corrections for servos with reversed roll logic for left servo
-        left_tail_angle = 90.0 + (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)+ correction_roll  #change the + or + on both lines to correct the respective angle direction of response
-        right_tail_angle = 90.0 - (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0) + correction_roll
+        # === Apply recovery factor for smooth ramp-up ===
+        correction_pitch *= self.recovery_factor
+        correction_roll *= self.recovery_factor
 
-        # Clamp servo angles
-        left_tail_angle = max(self.min_angle, min(self.max_angle, left_tail_angle))
+        # === Separate pitch and roll components ===
+        pitch_component_left  = (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)
+        pitch_component_right = (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0)
+
+        roll_component = correction_roll  # Roll is applied symmetrically, opposing directions
+
+        # === Final servo angles ===
+        # === Separate pitch scaling for left and right ===
+        pitch_component_left  = (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)
+        pitch_component_right = (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0)
+
+        # === Roll scaling adjusted to match servo ranges ===
+        roll_scale_left  = (90.0 - self.min_angle)
+        roll_scale_right = (self.max_angle - 90.0)
+
+        # === Apply scaled roll correction ===
+        left_tail_angle  = 90.0 + pitch_component_left  - (correction_roll * roll_scale_left / self.correction_limit_roll)
+        right_tail_angle = 90.0 - pitch_component_right - (correction_roll * roll_scale_right / self.correction_limit_roll)
+
+        # === Clamp servo angles ===
+        left_tail_angle  = max(self.min_angle, min(self.max_angle, left_tail_angle))
         right_tail_angle = max(self.min_angle, min(self.max_angle, right_tail_angle))
 
-        # Publish servo commands
+        # === Optional debugging log ===
+        #self.get_logger().info(f"Left Tail: {left_tail_angle:.2f}, Right Tail: {right_tail_angle:.2f}, Pitch Correction: {correction_pitch:.2f}, Roll Correction: {correction_roll:.2f}")
+
+        # === Publish the servo commands ===
         command = ServoMovementCommand()
         command.servo_numbers = [4, 5]
         command.target_angles = [left_tail_angle, right_tail_angle]
         command.durations = [0.033, 0.033]
         self.servo_publisher.publish(command)
+
+
+
 
         # Logging
         #self.get_logger().info(f'Pitch Error: {error_pitch:.2f}, Roll Error: {error_roll:.2f}')

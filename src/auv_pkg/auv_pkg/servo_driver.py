@@ -28,6 +28,8 @@ class ServoDriverNode(LifecycleNode):
         self.command_subscriber = None
         self.tail_command_subscriber = None
         self.heartbeat_timer = None
+        self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
+
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Configuring Servo Driver Node...')
@@ -102,7 +104,15 @@ class ServoDriverNode(LifecycleNode):
     def _servo_command_callback(self, msg: ServoMovementCommand):
         if self.debug_logging:
             self.get_logger().info(f'Received command: {msg}')
+
         try:
+            # === PUBLISH BUSY STATUS ===
+            if 'end' in msg.movement_type:
+                self._publish_busy_status(False)  # Mark IDLE at the end of sequence
+            else:
+                self._publish_busy_status(True)   # Mark BUSY during normal commands
+
+            # === NORMAL SERVO EXECUTION ===
             if not self.simulation_mode:
                 for i, servo_number in enumerate(msg.servo_numbers):
                     if servo_number < len(self.current_angles) and servo_number in self.servos:
@@ -111,9 +121,12 @@ class ServoDriverNode(LifecycleNode):
             else:
                 for i, servo_number in enumerate(msg.servo_numbers):
                     self.current_angles[servo_number] = msg.target_angles[i]
+
             self._publish_current_servo_angles()
+
         except Exception as e:
             self.get_logger().error(f'Failed to execute command: {e}')
+
 
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
@@ -124,6 +137,13 @@ class ServoDriverNode(LifecycleNode):
         heartbeat_msg = String()
         heartbeat_msg.data = 'alive'
         self.angles_publisher.publish(heartbeat_msg)  # Optionally use a separate heartbeat topic
+        
+    def _publish_busy_status(self, busy: bool):
+        status_msg = String()
+        status_msg.data = 'busy' if busy else 'idle'
+        self.busy_status_publisher.publish(status_msg)
+        self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
+
 
 
 def main(args=None):

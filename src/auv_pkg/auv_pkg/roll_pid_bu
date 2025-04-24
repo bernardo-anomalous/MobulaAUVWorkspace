@@ -51,13 +51,6 @@ class WingRollController(Node):
 
         # Timer for PID updates
         self.timer = self.create_timer(0.033, self.update_pid)  # Update at ~30 Hz
-        
-        self.last_imu_time = self.get_clock().now()
-        self.imu_timeout_sec = 1.0  # Time window to consider IMU data stale
-        self.recovery_factor = 0.0  # Starts at zero, ramps up to 1.0
-        self.recovery_rate = 0.05   # Speed of ramp-up (tune this value)
-        self.imu_data_valid = False
-
 
         self.get_logger().info('Wing Roll Controller Node Initialized')
 
@@ -65,9 +58,8 @@ class WingRollController(Node):
         self.target_roll = msg.data
 
     def imu_callback(self, msg):
+        # Extract current roll from IMU data
         self.current_roll = msg.x  # Assuming roll is in the x field of the IMU message
-        self.last_imu_time = self.get_clock().now()
-        self.imu_data_valid = True
 
     def pid_activation_callback(self, msg):
         self.pid_active = msg.data
@@ -83,31 +75,16 @@ class WingRollController(Node):
                 self.get_logger().info("Wing PID controllers activated.")
                 self.last_pid_active_state = True
 
-        now = self.get_clock().now()
-        time_since_last_imu = (now.nanoseconds - self.last_imu_time.nanoseconds) / 1e9
-
-        # Check IMU data freshness
-        if time_since_last_imu > self.imu_timeout_sec:
-            self.imu_data_valid = False
-            self.recovery_factor = 0.0  # Reset ramp-up
-            return  # Skip PID calculation if no valid data
-
-        if not self.imu_data_valid:
-            return  # Extra safety check, though this line is optional
-
-        # Ramp-up recovery factor after IMU comes back
-        if self.recovery_factor < 1.0:
-            self.recovery_factor += self.recovery_rate
-            self.recovery_factor = min(self.recovery_factor, 1.0)
-
         # Time calculations
         current_time = self.get_clock().now()
         dt = (current_time.nanoseconds / 1e9)
+
         if dt <= 0:
             return
 
-        # Roll PID calculations
-        error_roll = -(self.target_roll - self.current_roll)
+        # Roll PID
+        error_roll = self.target_roll - self.current_roll
+
         proportional_roll = self.kp_roll * error_roll
         self.integral_error_roll += error_roll * dt
         self.integral_error_roll = max(-self.integral_limit_roll, min(self.integral_limit_roll, self.integral_error_roll))
@@ -120,11 +97,8 @@ class WingRollController(Node):
         correction_roll = max(-self.correction_limit_roll, min(self.correction_limit_roll, correction_roll))
         self.previous_correction_roll = correction_roll
 
-        # Apply recovery ramp factor here for smooth re-entry
-        correction_roll *= self.recovery_factor
-
         # Servo angle adjustments based on roll correction
-        left_wing_angle = 30.0 + (correction_roll / self.correction_limit_roll) * 30.0
+        left_wing_angle = 30.0 + (correction_roll / self.correction_limit_roll) * 30.0  # Center at 30.0
         right_wing_angle = 30.0 + (correction_roll / self.correction_limit_roll) * 30.0
 
         # Clamp servo angles
@@ -133,11 +107,10 @@ class WingRollController(Node):
 
         # Publish servo commands
         command = ServoMovementCommand()
-        command.servo_numbers = [1, 3]
+        command.servo_numbers = [1, 3]  # Assuming servos 1 and 2 control the wings
         command.target_angles = [left_wing_angle, right_wing_angle]
         command.durations = [0.033, 0.033]
         self.servo_publisher.publish(command)
-
 
         
 
