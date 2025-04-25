@@ -12,6 +12,8 @@ import os
 import sys
 import time
 from collections import deque
+import threading
+
 
 class ServoDriverNode(LifecycleNode):
     def __init__(self):
@@ -44,6 +46,8 @@ class ServoDriverNode(LifecycleNode):
         self.failure_timestamps = deque()
         self.max_failures = 3
         self.failure_window_seconds = 30  # Restart if 3 failures occur within 30 seconds
+        self.target_lock = threading.Lock()
+
 
     def restart_process(self):
         self.get_logger().error("Servo Driver Node restarting itself now...")
@@ -71,9 +75,13 @@ class ServoDriverNode(LifecycleNode):
     def refresh_servo_positions(self):
         if not self.simulation_mode:
             try:
-                for servo_number, target_angle in enumerate(self.last_target_angles):
+                with self.target_lock:
+                    target_angles_copy = self.last_target_angles.copy()
+
+                for servo_number, target_angle in enumerate(target_angles_copy):
                     if servo_number in self.servos:
                         self.servos[servo_number].angle = target_angle
+
             except Exception as e:
                 self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
                 if "Remote I/O" in str(e) or "No device" in str(e):
@@ -93,7 +101,7 @@ class ServoDriverNode(LifecycleNode):
                 self.get_logger().info('Initializing hardware...')
                 i2c = board.I2C()
                 self.pca = PCA9685(i2c)
-                self.pca.frequency = 60
+                self.pca.frequency = 100
                 self.servos = {
                     0: Servo(self.pca.channels[0], min_pulse=400, max_pulse=2500),
                     1: Servo(self.pca.channels[1], min_pulse=400, max_pulse=2500),
@@ -124,9 +132,8 @@ class ServoDriverNode(LifecycleNode):
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Activating Servo Driver Node...')
-        self.heartbeat_timer = self.create_timer(
-            1.0 / self.get_parameter('update_rate_hz').value, self._publish_heartbeat
-        )
+        self.heartbeat_timer = self.create_timer(1.0, self._publish_heartbeat)  # 1 Hz heartbeat
+
         self.start_refresh_loop()
         return TransitionCallbackReturn.SUCCESS
 
@@ -174,9 +181,11 @@ class ServoDriverNode(LifecycleNode):
                     self._publish_busy_status("nominal: roll and pitch pid engaged")
 
             # === NORMAL SERVO EXECUTION ===
-            for i, servo_number in enumerate(msg.servo_numbers):
-                if 0 <= servo_number < len(self.last_target_angles):
-                    self.last_target_angles[servo_number] = msg.target_angles[i]
+            with self.target_lock:
+                for i, servo_number in enumerate(msg.servo_numbers):
+                    if 0 <= servo_number < len(self.last_target_angles):
+                        self.last_target_angles[servo_number] = msg.target_angles[i]
+
 
             self._publish_current_servo_angles()
 
