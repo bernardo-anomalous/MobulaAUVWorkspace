@@ -9,6 +9,9 @@ from auv_custom_interfaces.msg import ServoMovementCommand
 class TailPitchRollController(Node):
     def __init__(self):
         super().__init__('Pitch_PID')
+        
+
+
 
         # PID Coefficients for Pitch
         self.kp_pitch = 1.5
@@ -69,13 +72,21 @@ class TailPitchRollController(Node):
         self.create_subscription(Vector3, 'imu/euler', self.imu_callback, 10)
 
         # Timer for PID updates
-        self.timer = self.create_timer(0.05, self.update_pid)  # Update at ~30 Hz
+        self.timer = self.create_timer(0.02, self.update_pid)  # Update at ~30 Hz
         
         self.last_imu_time = self.get_clock().now()
         self.imu_timeout_sec = 1.0  # IMU considered stale after 1 second
         self.recovery_factor = 0.0   # Starts at zero, ramps up to 1.0
         self.recovery_rate = 0.05    # Ramp speed for recovery
         self.imu_data_valid = False
+        
+                # Pitch scaling factors for asymmetric tail response
+        self.left_pitch_scale = (90.0 - self.min_angle)    # Scale for left tail servo
+        self.right_pitch_scale = (self.max_angle - 90.0)   # Scale for right tail servo
+
+        # Optional gain factors in case mechanical linkages are not symmetric
+        self.left_tail_gain = 1.0   # Adjust this if the left tail needs more/less authority
+        self.right_tail_gain = 1.0  # Adjust this if the right tail needs more/less authority
 
 
         self.get_logger().info('Tail Pitch and Roll Controller Node Initialized')
@@ -152,16 +163,9 @@ class TailPitchRollController(Node):
         correction_pitch *= self.recovery_factor
         correction_roll *= self.recovery_factor
 
-        # === Separate pitch and roll components ===
-        pitch_component_left  = (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)
-        pitch_component_right = (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0)
-
-        roll_component = correction_roll  # Roll is applied symmetrically, opposing directions
-
-        # === Final servo angles ===
-        # === Separate pitch scaling for left and right ===
-        pitch_component_left  = (correction_pitch / self.correction_limit_pitch) * (90.0 - self.min_angle)
-        pitch_component_right = (correction_pitch / self.correction_limit_pitch) * (self.max_angle - 90.0)
+        # === Proper pitch scaling with gains and asymmetric factors ===
+        pitch_component_left  = self.left_tail_gain  * (correction_pitch / self.correction_limit_pitch) * self.left_pitch_scale
+        pitch_component_right = self.right_tail_gain * (correction_pitch / self.correction_limit_pitch) * self.right_pitch_scale
 
         # === Roll scaling adjusted to match servo ranges ===
         roll_scale_left  = (90.0 - self.min_angle)
@@ -174,9 +178,6 @@ class TailPitchRollController(Node):
         # === Clamp servo angles ===
         left_tail_angle  = max(self.min_angle, min(self.max_angle, left_tail_angle))
         right_tail_angle = max(self.min_angle, min(self.max_angle, right_tail_angle))
-
-        # === Optional debugging log ===
-        #self.get_logger().info(f"Left Tail: {left_tail_angle:.2f}, Right Tail: {right_tail_angle:.2f}, Pitch Correction: {correction_pitch:.2f}, Roll Correction: {correction_roll:.2f}")
 
         # === Publish the servo commands ===
         command = ServoMovementCommand()

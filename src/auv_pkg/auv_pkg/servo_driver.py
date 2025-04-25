@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import State, TransitionCallbackReturn
@@ -6,6 +8,10 @@ from auv_custom_interfaces.msg import ServoMovementCommand
 from adafruit_motor.servo import Servo
 from adafruit_pca9685 import PCA9685
 import board
+import os
+import sys
+import time
+from collections import deque
 
 class ServoDriverNode(LifecycleNode):
     def __init__(self):
@@ -16,28 +22,46 @@ class ServoDriverNode(LifecycleNode):
         self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 90.0, 90.0])
         self.declare_parameter('update_rate_hz', 100.0)
         self.declare_parameter('simulation_mode', False)
-        self.declare_parameter('debug_logging', False)  # New parameter to toggle detailed logging
+        self.declare_parameter('debug_logging', False)
 
         self.simulation_mode = False
         self.debug_logging = False
         self.pca = None
         self.servos = {}
         self.current_angles = []
+        self.last_target_angles = [90.0] * 6
 
         self.angles_publisher = None
         self.command_subscriber = None
         self.tail_command_subscriber = None
         self.heartbeat_timer = None
-        self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
-        self.last_published_status = None  # Track last status string
-        self.last_published_status = None
-        self.executing_movement = False  # Flag for whether we're in a movement sequence
-        
-        # === Track last known angles ===
-        self.last_target_angles = [90.0] * 6  # Or your default "neutral" positions
         self.refresh_timer = None
+        self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
+        self.last_published_status = None
+        self.executing_movement = False
 
+        # Failure tracking
+        self.failure_timestamps = deque()
+        self.max_failures = 3
+        self.failure_window_seconds = 30  # Restart if 3 failures occur within 30 seconds
 
+    def restart_process(self):
+        self.get_logger().error("Servo Driver Node restarting itself now...")
+        python = sys.executable
+        os.execv(python, [python] + sys.argv)
+
+    def record_failure_and_check_restart(self):
+        current_time = time.time()
+        self.failure_timestamps.append(current_time)
+        while self.failure_timestamps and (current_time - self.failure_timestamps[0] > self.failure_window_seconds):
+            self.failure_timestamps.popleft()
+
+        if len(self.failure_timestamps) >= self.max_failures:
+            self.get_logger().fatal(
+                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Restarting process..."
+            )
+            time.sleep(2)
+            self.restart_process()
 
     def start_refresh_loop(self):
         update_rate_hz = self.get_parameter('update_rate_hz').value
@@ -51,8 +75,9 @@ class ServoDriverNode(LifecycleNode):
                     if servo_number in self.servos:
                         self.servos[servo_number].angle = target_angle
             except Exception as e:
-                self.get_logger().error(f"Error while refreshing servo positions: {e}")
-
+                self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
+                if "Remote I/O" in str(e) or "No device" in str(e):
+                    self.record_failure_and_check_restart()
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Configuring Servo Driver Node...')
@@ -82,20 +107,19 @@ class ServoDriverNode(LifecycleNode):
                     self.servos[i].angle = angle
 
             self.current_angles = self.get_parameter('glide_position').value
-
             self.angles_publisher = self.create_publisher(Float32MultiArray, 'current_servo_angles', 10)
             self.command_subscriber = self.create_subscription(
-                ServoMovementCommand, 'servo_driver_commands', self._servo_command_callback, 10
-            )
+                ServoMovementCommand, 'servo_driver_commands', self._servo_command_callback, 10)
             self.tail_command_subscriber = self.create_subscription(
-                ServoMovementCommand, 'tail_commands', self._servo_command_callback, 10
-            )
+                ServoMovementCommand, 'tail_commands', self._servo_command_callback, 10)
 
             self.get_logger().info('Configuration successful.')
             return TransitionCallbackReturn.SUCCESS
 
         except Exception as e:
             self.get_logger().error(f'Failed to configure hardware: {e}')
+            if "Remote I/O" in str(e) or "No device" in str(e):
+                self.record_failure_and_check_restart()
             return TransitionCallbackReturn.FAILURE
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
@@ -103,8 +127,7 @@ class ServoDriverNode(LifecycleNode):
         self.heartbeat_timer = self.create_timer(
             1.0 / self.get_parameter('update_rate_hz').value, self._publish_heartbeat
         )
-        self.start_refresh_loop()  # Start the new refresh loop
-
+        self.start_refresh_loop()
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
@@ -144,32 +167,23 @@ class ServoDriverNode(LifecycleNode):
                 self._publish_busy_status("nominal: roll and pitch pid engaged")
             elif movement_type != 'pid_control':
                 if not self.executing_movement:
-                    # Only announce busy when we start a new sequence
                     self.executing_movement = True
                     self._publish_busy_status(f"busy: executing {msg.movement_type}")
-                # Stay busy — do not publish again if already in executing state
             else:
                 if not self.executing_movement:
                     self._publish_busy_status("nominal: roll and pitch pid engaged")
 
             # === NORMAL SERVO EXECUTION ===
-            # === Update internal target angles array ===
             for i, servo_number in enumerate(msg.servo_numbers):
                 if 0 <= servo_number < len(self.last_target_angles):
                     self.last_target_angles[servo_number] = msg.target_angles[i]
-
-
-            else:
-                for i, servo_number in enumerate(msg.servo_numbers):
-                    self.current_angles[servo_number] = msg.target_angles[i]
 
             self._publish_current_servo_angles()
 
         except Exception as e:
             self.get_logger().error(f'Failed to execute command: {e}')
-
-
-
+            if "Remote I/O" in str(e) or "No device" in str(e):
+                self.record_failure_and_check_restart()
 
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
@@ -180,19 +194,14 @@ class ServoDriverNode(LifecycleNode):
         heartbeat_msg = String()
         heartbeat_msg.data = 'alive'
         self.heartbeat_publisher.publish(heartbeat_msg)
-  # Optionally use a separate heartbeat topic
-        
+
     def _publish_busy_status(self, status_message: str):
         if status_message != self.last_published_status:
             status_msg = String()
             status_msg.data = status_message
             self.busy_status_publisher.publish(status_msg)
             self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
-            self.last_published_status = status_message  # Update last status
-
-
-
-
+            self.last_published_status = status_message
 
 def main(args=None):
     rclpy.init(args=args)
@@ -204,7 +213,6 @@ def main(args=None):
     finally:
         if rclpy.ok():
             rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

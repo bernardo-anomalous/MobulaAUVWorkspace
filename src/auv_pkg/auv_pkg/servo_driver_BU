@@ -14,7 +14,7 @@ class ServoDriverNode(LifecycleNode):
 
         # Parameters
         self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 90.0, 90.0])
-        self.declare_parameter('update_rate_hz', 10.0)
+        self.declare_parameter('update_rate_hz', 100.0)
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)  # New parameter to toggle detailed logging
 
@@ -32,12 +32,32 @@ class ServoDriverNode(LifecycleNode):
         self.last_published_status = None  # Track last status string
         self.last_published_status = None
         self.executing_movement = False  # Flag for whether we're in a movement sequence
+        
+        # === Track last known angles ===
+        self.last_target_angles = [90.0] * 6  # Or your default "neutral" positions
+        self.refresh_timer = None
 
 
+
+    def start_refresh_loop(self):
+        update_rate_hz = self.get_parameter('update_rate_hz').value
+        self.refresh_timer = self.create_timer(1.0 / update_rate_hz, self.refresh_servo_positions)
+        self.get_logger().info(f"Started refresh loop at {update_rate_hz} Hz.")
+
+    def refresh_servo_positions(self):
+        if not self.simulation_mode:
+            try:
+                for servo_number, target_angle in enumerate(self.last_target_angles):
+                    if servo_number in self.servos:
+                        self.servos[servo_number].angle = target_angle
+            except Exception as e:
+                self.get_logger().error(f"Error while refreshing servo positions: {e}")
 
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Configuring Servo Driver Node...')
+        self.heartbeat_publisher = self.create_publisher(String, 'servo_driver/heartbeat', 10)
+
         try:
             self.simulation_mode = self.get_parameter('simulation_mode').value
             self.debug_logging = self.get_parameter('debug_logging').value
@@ -83,6 +103,8 @@ class ServoDriverNode(LifecycleNode):
         self.heartbeat_timer = self.create_timer(
             1.0 / self.get_parameter('update_rate_hz').value, self._publish_heartbeat
         )
+        self.start_refresh_loop()  # Start the new refresh loop
+
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
@@ -90,6 +112,10 @@ class ServoDriverNode(LifecycleNode):
         if self.heartbeat_timer:
             self.heartbeat_timer.cancel()
             self.heartbeat_timer = None
+        if self.refresh_timer:
+            self.refresh_timer.cancel()
+            self.refresh_timer = None
+
         if not self.simulation_mode and self.pca:
             try:
                 for channel in self.pca.channels:
@@ -127,11 +153,12 @@ class ServoDriverNode(LifecycleNode):
                     self._publish_busy_status("nominal: roll and pitch pid engaged")
 
             # === NORMAL SERVO EXECUTION ===
-            if not self.simulation_mode:
-                for i, servo_number in enumerate(msg.servo_numbers):
-                    if servo_number < len(self.current_angles) and servo_number in self.servos:
-                        self.servos[servo_number].angle = msg.target_angles[i]
-                    self.current_angles[servo_number] = msg.target_angles[i]
+            # === Update internal target angles array ===
+            for i, servo_number in enumerate(msg.servo_numbers):
+                if 0 <= servo_number < len(self.last_target_angles):
+                    self.last_target_angles[servo_number] = msg.target_angles[i]
+
+
             else:
                 for i, servo_number in enumerate(msg.servo_numbers):
                     self.current_angles[servo_number] = msg.target_angles[i]
@@ -152,7 +179,8 @@ class ServoDriverNode(LifecycleNode):
     def _publish_heartbeat(self):
         heartbeat_msg = String()
         heartbeat_msg.data = 'alive'
-        self.angles_publisher.publish(heartbeat_msg)  # Optionally use a separate heartbeat topic
+        self.heartbeat_publisher.publish(heartbeat_msg)
+  # Optionally use a separate heartbeat topic
         
     def _publish_busy_status(self, status_message: str):
         if status_message != self.last_published_status:
