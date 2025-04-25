@@ -12,6 +12,8 @@ import os
 import sys
 import time
 from collections import deque
+import threading
+
 
 class ServoDriverNode(LifecycleNode):
     def __init__(self):
@@ -20,7 +22,7 @@ class ServoDriverNode(LifecycleNode):
 
         # Parameters
         self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 90.0, 90.0])
-        self.declare_parameter('update_rate_hz', 100.0)
+        self.declare_parameter('update_rate_hz', 30.0)
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)
 
@@ -44,6 +46,8 @@ class ServoDriverNode(LifecycleNode):
         self.failure_timestamps = deque()
         self.max_failures = 3
         self.failure_window_seconds = 30  # Restart if 3 failures occur within 30 seconds
+        self.target_lock = threading.Lock()
+
 
     def restart_process(self):
         self.get_logger().error("Servo Driver Node restarting itself now...")
@@ -71,9 +75,13 @@ class ServoDriverNode(LifecycleNode):
     def refresh_servo_positions(self):
         if not self.simulation_mode:
             try:
-                for servo_number, target_angle in enumerate(self.last_target_angles):
+                with self.target_lock:
+                    target_angles_copy = self.last_target_angles.copy()
+
+                for servo_number, target_angle in enumerate(target_angles_copy):
                     if servo_number in self.servos:
                         self.servos[servo_number].angle = target_angle
+
             except Exception as e:
                 self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
                 if "Remote I/O" in str(e) or "No device" in str(e):
@@ -173,9 +181,11 @@ class ServoDriverNode(LifecycleNode):
                     self._publish_busy_status("nominal: roll and pitch pid engaged")
 
             # === NORMAL SERVO EXECUTION ===
-            for i, servo_number in enumerate(msg.servo_numbers):
-                if 0 <= servo_number < len(self.last_target_angles):
-                    self.last_target_angles[servo_number] = msg.target_angles[i]
+            with self.target_lock:
+                for i, servo_number in enumerate(msg.servo_numbers):
+                    if 0 <= servo_number < len(self.last_target_angles):
+                        self.last_target_angles[servo_number] = msg.target_angles[i]
+
 
             self._publish_current_servo_angles()
 
