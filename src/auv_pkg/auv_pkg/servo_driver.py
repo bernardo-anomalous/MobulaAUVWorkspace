@@ -21,7 +21,7 @@ class ServoDriverNode(LifecycleNode):
         self.get_logger().info('Servo Driver Node initialized.')
 
         # Parameters
-        self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 90.0, 90.0])
+        self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 85.0, 130.0])
         self.declare_parameter('update_rate_hz', 30.0)
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)
