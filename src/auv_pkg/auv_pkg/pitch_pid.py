@@ -56,9 +56,12 @@ class TailPitchRollController(Node):
         self.target_roll = 0.0
         self.current_roll = 0.0
 
-        # Servo limits
-        self.min_angle = 40.0
-        self.max_angle = 140.0
+        # Servo limits // replace here after running calibration 
+        self.servo_limits = {
+            4: {"min": 30.0, "max": 150.0},
+            5: {"min": 60.0, "max": 180.0},
+        }
+
 
         # Smoothing factor for IMU noise
         self.alpha = 0.8
@@ -176,8 +179,8 @@ class TailPitchRollController(Node):
         right_tail_angle = 90.0 - pitch_component_right + (correction_roll * roll_scale_right / self.correction_limit_roll)
 
         # === Clamp servo angles ===
-        left_tail_angle  = max(self.min_angle, min(self.max_angle, left_tail_angle))
-        right_tail_angle = max(self.min_angle, min(self.max_angle, right_tail_angle))
+        left_tail_angle  = max(self.servo_limits[4]["min"], min(self.servo_limits[4]["max"], left_tail_angle))
+        right_tail_angle = max(self.servo_limits[5]["min"], min(self.servo_limits[5]["max"], right_tail_angle))
 
         # === Publish the servo commands ===
         command = ServoMovementCommand()
