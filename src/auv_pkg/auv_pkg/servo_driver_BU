@@ -196,7 +196,9 @@ class ServoDriverNode(LifecycleNode):
 
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
-        angles_msg.data = self.current_angles
+        with self.target_lock:
+            angles_msg.data = self.last_target_angles.copy()
+
         self.angles_publisher.publish(angles_msg)
 
     def _publish_heartbeat(self):

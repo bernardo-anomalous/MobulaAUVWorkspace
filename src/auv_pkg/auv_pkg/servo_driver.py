@@ -86,12 +86,35 @@ class ServoDriverNode(LifecycleNode):
                 self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
                 if "Remote I/O" in str(e) or "No device" in str(e):
                     self.record_failure_and_check_restart()
+                    
+    def move_servos_to_glide_position(self):
+        glide_position = self.get_parameter('glide_position').value
+
+        if not self.simulation_mode:
+            self.get_logger().info(f"Moving servos to glide position: {glide_position}")
+            for i, angle in enumerate(glide_position):
+                if i in self.servos:
+                    self.servos[i].angle = angle
+
+        # Update internal tracking
+        with self.target_lock:
+            self.last_target_angles = glide_position.copy()
+        self.current_angles = glide_position.copy()
+
+        # Immediately publish angles
+        self._publish_current_servo_angles()
+
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Configuring Servo Driver Node...')
+
+        # === Publishers First ===
+        self.angles_publisher = self.create_publisher(Float32MultiArray, 'current_servo_angles', 10)
         self.heartbeat_publisher = self.create_publisher(String, 'servo_driver/heartbeat', 10)
+        self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
 
         try:
+            # === Load Parameters ===
             self.simulation_mode = self.get_parameter('simulation_mode').value
             self.debug_logging = self.get_parameter('debug_logging').value
 
@@ -110,12 +133,11 @@ class ServoDriverNode(LifecycleNode):
                     4: Servo(self.pca.channels[4], min_pulse=500, max_pulse=2500),
                     5: Servo(self.pca.channels[5], min_pulse=500, max_pulse=2500),
                 }
-                glide_position = self.get_parameter('glide_position').value
-                for i, angle in enumerate(glide_position):
-                    self.servos[i].angle = angle
 
-            self.current_angles = self.get_parameter('glide_position').value
-            self.angles_publisher = self.create_publisher(Float32MultiArray, 'current_servo_angles', 10)
+            # === Move Servos to Glide Position ===
+            self.move_servos_to_glide_position()
+
+            # === Subscribers ===
             self.command_subscriber = self.create_subscription(
                 ServoMovementCommand, 'servo_driver_commands', self._servo_command_callback, 10)
             self.tail_command_subscriber = self.create_subscription(
@@ -129,6 +151,7 @@ class ServoDriverNode(LifecycleNode):
             if "Remote I/O" in str(e) or "No device" in str(e):
                 self.record_failure_and_check_restart()
             return TransitionCallbackReturn.FAILURE
+
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Activating Servo Driver Node...')
