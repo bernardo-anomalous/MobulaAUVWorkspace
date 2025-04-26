@@ -135,7 +135,7 @@ class WingRollController(Node):
         command = ServoMovementCommand()
         command.servo_numbers = [1, 3]
         command.target_angles = [left_wing_angle, right_wing_angle]
-        command.durations = [0.033, 0.033]
+        command.durations = [1.0, 1.0]
         command.movement_type = "pid_control"
         self.servo_publisher.publish(command)
 

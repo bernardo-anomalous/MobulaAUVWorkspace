@@ -172,8 +172,8 @@ class TailPitchRollController(Node):
         roll_scale_right = (self.max_angle - 90.0)
 
         # === Apply scaled roll correction ===
-        left_tail_angle  = 90.0 + pitch_component_left  - (correction_roll * roll_scale_left / self.correction_limit_roll)
-        right_tail_angle = 90.0 - pitch_component_right - (correction_roll * roll_scale_right / self.correction_limit_roll)
+        left_tail_angle  = 90.0 + pitch_component_left  + (correction_roll * roll_scale_left / self.correction_limit_roll)
+        right_tail_angle = 90.0 - pitch_component_right + (correction_roll * roll_scale_right / self.correction_limit_roll)
 
         # === Clamp servo angles ===
         left_tail_angle  = max(self.min_angle, min(self.max_angle, left_tail_angle))
@@ -183,7 +183,7 @@ class TailPitchRollController(Node):
         command = ServoMovementCommand()
         command.servo_numbers = [4, 5]
         command.target_angles = [left_tail_angle, right_tail_angle]
-        command.durations = [0.033, 0.033]
+        command.durations = [1.0, 1.0]
         command.movement_type = "pid_control"
         self.servo_publisher.publish(command)
 
