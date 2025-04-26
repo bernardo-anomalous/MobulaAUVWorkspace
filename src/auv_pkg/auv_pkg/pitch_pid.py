@@ -84,8 +84,9 @@ class TailPitchRollController(Node):
         self.imu_data_valid = False
         
                 # Pitch scaling factors for asymmetric tail response
-        self.left_pitch_scale = (90.0 - self.min_angle)    # Scale for left tail servo
-        self.right_pitch_scale = (self.max_angle - 90.0)   # Scale for right tail servo
+        self.left_pitch_scale = (90.0 - self.servo_limits[4]["min"])
+        self.right_pitch_scale = (self.servo_limits[5]["max"] - 90.0)
+        # Scale for right tail servo
 
         # Optional gain factors in case mechanical linkages are not symmetric
         self.left_tail_gain = 1.0   # Adjust this if the left tail needs more/less authority
@@ -171,8 +172,9 @@ class TailPitchRollController(Node):
         pitch_component_right = self.right_tail_gain * (correction_pitch / self.correction_limit_pitch) * self.right_pitch_scale
 
         # === Roll scaling adjusted to match servo ranges ===
-        roll_scale_left  = (90.0 - self.min_angle)
-        roll_scale_right = (self.max_angle - 90.0)
+        roll_scale_left  = (90.0 - self.servo_limits[4]["min"])
+        roll_scale_right = (self.servo_limits[5]["max"] - 90.0)
+
 
         # === Apply scaled roll correction ===
         left_tail_angle  = 90.0 + pitch_component_left  + (correction_roll * roll_scale_left / self.correction_limit_roll)
