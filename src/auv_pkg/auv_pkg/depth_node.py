@@ -31,6 +31,9 @@ class DepthSensorNode(Node):
         self.water_buffer = deque(maxlen=5)
         self.air_buffer = deque(maxlen=5)
 
+        # Deadband setting (meters)
+        self.deadband_threshold = 0.005  # ±5 cm
+
         # Timer for 2 Hz publishing
         self.timer = self.create_timer(0.5, self.publish_depth)
 
@@ -71,6 +74,11 @@ class DepthSensorNode(Node):
 
         return reference_sea_level_pressure
 
+    def apply_deadband(self, value):
+        if abs(value) < self.deadband_threshold:
+            return 0.0
+        return value
+
     def publish_depth(self):
         if self.sensor.read():
             pressure_mbar = self.sensor.pressure(ms5837.UNITS_mbar)
@@ -86,6 +94,10 @@ class DepthSensorNode(Node):
             # Compute moving averages
             filtered_depth_water = sum(self.water_buffer) / len(self.water_buffer)
             filtered_depth_air = sum(self.air_buffer) / len(self.air_buffer)
+
+            # Apply deadband logic
+            filtered_depth_water = self.apply_deadband(filtered_depth_water)
+            filtered_depth_air = self.apply_deadband(filtered_depth_air)
 
             # Publish seawater depth (filtered)
             depth_msg = Float32()
