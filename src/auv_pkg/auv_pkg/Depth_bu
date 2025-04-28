@@ -6,6 +6,7 @@ from std_msgs.msg import Float32
 import ms5837
 import time
 from collections import deque
+import statistics
 
 class DepthSensorNode(Node):
     def __init__(self):
@@ -27,11 +28,11 @@ class DepthSensorNode(Node):
         self.surface_pressure = self.calibrate_surface_pressure()
         self.air_reference_pressure = self.calculate_air_reference()
 
-        # Moving average buffers
+        # Median filter buffers (5-sample rolling window)
         self.water_buffer = deque(maxlen=5)
         self.air_buffer = deque(maxlen=5)
 
-        # Timer for 2 Hz publishing
+        # Set timer for 2 Hz publishing
         self.timer = self.create_timer(0.5, self.publish_depth)
 
     def calibrate_surface_pressure(self, duration=5):
@@ -83,9 +84,9 @@ class DepthSensorNode(Node):
             self.water_buffer.append(depth_water)
             self.air_buffer.append(depth_air)
 
-            # Compute moving averages
-            filtered_depth_water = sum(self.water_buffer) / len(self.water_buffer)
-            filtered_depth_air = sum(self.air_buffer) / len(self.air_buffer)
+            # Compute medians
+            filtered_depth_water = statistics.median(self.water_buffer)
+            filtered_depth_air = statistics.median(self.air_buffer)
 
             # Publish seawater depth (filtered)
             depth_msg = Float32()
