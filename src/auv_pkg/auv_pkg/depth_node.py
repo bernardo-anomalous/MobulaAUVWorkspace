@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Float32
+import ms5837
+import time
+
+class DepthSensorNode(Node):
+    def __init__(self):
+        super().__init__('depth_sensor_node')
+
+        # Publishers
+        self.publisher_ = self.create_publisher(Float32, '/depth', 10)
+        self.air_publisher_ = self.create_publisher(Float32, '/depth_air', 10)
+
+        # Sensor setup
+        self.sensor = ms5837.MS5837_30BA(bus=0)
+        if not self.sensor.init():
+            self.get_logger().error("❌ Sensor could not be initialized! Check wiring and power.")
+            raise RuntimeError("Sensor initialization failed")
+
+        self.get_logger().info("✅ Sensor initialized successfully.")
+
+        # Calibrate seawater pressure baseline (sensor floating at the surface)
+        self.surface_pressure = self.calibrate_surface_pressure()
+
+        # Set up air reference using known testing altitude
+        self.air_reference_pressure = self.calculate_air_reference()
+
+        # Set timer to publish at 2 Hz (0.5-second interval)
+        self.timer = self.create_timer(0.5, self.publish_depth)
+
+    def calibrate_surface_pressure(self, duration=5):
+        self.get_logger().info(f"🟢 Calibrating surface pressure for {duration} seconds. Keep the AUV floating at the surface...")
+        readings = []
+        start_time = time.time()
+        while time.time() - start_time < duration:
+            if self.sensor.read():
+                pressure = self.sensor.pressure(ms5837.UNITS_mbar)
+                readings.append(pressure)
+            time.sleep(0.1)
+
+        if readings:
+            avg_pressure = sum(readings) / len(readings)
+            self.get_logger().info(f"✅ Surface pressure calibration complete: {avg_pressure:.2f} mbar")
+            return avg_pressure
+        else:
+            self.get_logger().error("❌ Failed to read sensor during calibration!")
+            raise RuntimeError("Calibration failed")
+
+    def calculate_air_reference(self):
+        # Air calculation constants
+        DENSITY_AIR = 1.225          # kg/m³
+        GRAVITY = 9.80665            # m/s²
+        KNOWN_TESTING_ALTITUDE = 12.0  # meters (hardcoded for your testing location)
+
+        # Read initial pressure at your testing altitude
+        if not self.sensor.read():
+            self.get_logger().error("❌ Failed to read sensor during air reference calculation!")
+            raise RuntimeError("Sensor read failed")
+
+        initial_pressure = self.sensor.pressure(ms5837.UNITS_mbar)
+        reference_sea_level_pressure = initial_pressure + (DENSITY_AIR * GRAVITY * KNOWN_TESTING_ALTITUDE)
+
+        self.get_logger().info(
+            f"✅ Calculated sea-level reference pressure for air mode: {reference_sea_level_pressure:.2f} mbar "
+            f"(based on initial reading {initial_pressure:.2f} mbar at {KNOWN_TESTING_ALTITUDE} m altitude)"
+        )
+
+        return reference_sea_level_pressure
+
+    def publish_depth(self):
+        if self.sensor.read():
+            pressure_mbar = self.sensor.pressure(ms5837.UNITS_mbar)
+
+            # Seawater depth calculation
+            depth_water = (pressure_mbar - self.surface_pressure) / (1025 * 9.80665)
+
+            # Air altitude difference calculation (relative to sea level)
+            depth_air = (self.air_reference_pressure - pressure_mbar) / (1.225 * 9.80665)
+
+            # Publish seawater depth
+            depth_msg = Float32()
+            depth_msg.data = depth_water
+            self.publisher_.publish(depth_msg)
+
+            # Publish air-based depth (altitude difference)
+            air_depth_msg = Float32()
+            air_depth_msg.data = depth_air
+            self.air_publisher_.publish(air_depth_msg)
+        else:
+            self.get_logger().warn("⚠️ Sensor read failed!")
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = DepthSensorNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

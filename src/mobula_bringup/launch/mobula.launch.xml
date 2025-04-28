@@ -9,4 +9,5 @@
     <node pkg="auv_pkg" exec="servo_interpolation"/>
     <node pkg="auv_pkg" exec="pitch_pid"/>
     <node pkg="auv_pkg" exec="roll_pid"/>
+    <node pkg="auv_pkg" exec="depth_sensor"/>
 </launch>

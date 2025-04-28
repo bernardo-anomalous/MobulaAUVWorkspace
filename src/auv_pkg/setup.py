@@ -27,7 +27,8 @@ setup(
             "pitch_pid = auv_pkg.pitch_pid:main",
             "roll_pid = auv_pkg.roll_pid:main",
             "keyboard_control_swim = auv_pkg.keyboard_control_swim:main",
-            "camera_control = auv_pkg.camera_control:main"
+            "camera_control = auv_pkg.camera_control:main",
+            "depth_sensor = auv_pkg.depth_node:main"
         ],
     },
 )
