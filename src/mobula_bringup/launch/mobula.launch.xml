@@ -10,4 +10,5 @@
     <node pkg="auv_pkg" exec="pitch_pid"/>
     <node pkg="auv_pkg" exec="roll_pid"/>
     <node pkg="auv_pkg" exec="depth_sensor"/>
+    <node pkg="auv_pkg" exec="acceleration_node"/> 
 </launch>

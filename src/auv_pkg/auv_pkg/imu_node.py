@@ -25,20 +25,24 @@ class IMUNode(Node):
         self.imu_publisher_ = self.create_publisher(Imu, 'imu/data', 10)
         self.rpy_publisher_ = self.create_publisher(Vector3, 'imu/euler', 10)
         self.heading_publisher_ = self.create_publisher(String, 'imu/heading', 10)
-
         self.health_status_publisher = self.create_publisher(String, 'imu/health_status', 10)
+
         self.last_health_status = None
         self.last_failure_reason = None
 
-        self.timer = self.create_timer(0.1, self.publish_imu_data)  # 10 Hz update
+        self.timer = self.create_timer(0.1, self.publish_imu_data)  # 10 Hz
 
         self.i2c = None
         self.bno = None
 
-        # Failure tracking with time window
         self.failure_timestamps = deque()
         self.max_failures = 3
-        self.failure_window_seconds = 30  # Restart if 3 failures occur within 30 seconds
+        self.failure_window_seconds = 30
+
+        self.CRITICAL_ERRORS = [
+            "No device", "Remote I/O", "Input/output error", 
+            "Unprocessable Batch bytes", "Was not able to enable feature"
+        ]
 
         self.initialize_sensor()
 
@@ -60,8 +64,7 @@ class IMUNode(Node):
         if failure_count >= self.max_failures:
             self.publish_health_status(f"IMU RESTARTING | Reason: {self.last_failure_reason}")
             self.get_logger().fatal(
-                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Restarting process..."
-            )
+                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Restarting process...")
             time.sleep(2)
             self.restart_process()
         else:
@@ -91,9 +94,18 @@ class IMUNode(Node):
 
             self.i2c = busio.I2C(board.SCL, board.SDA)
             self.bno = BNO08X_I2C(self.i2c, address=0x4B)
-            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+
+            # Try enabling features one by one
+            try:
+                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            except Exception as feature_e:
+                self.get_logger().error(f"Critical error enabling feature: {feature_e}")
+                self.last_failure_reason = str(feature_e)
+                self.restart_process()  # 🔥 Immediate restart
+                return
+
             time.sleep(0.5)
 
             self.sensor_ready = True
@@ -103,27 +115,12 @@ class IMUNode(Node):
 
         except Exception as e:
             self.sensor_ready = False
+            self.last_failure_reason = str(e)
             self.get_logger().error(f"Error initializing sensor: {e}")
-            self.last_failure_reason = f"{e}"
-            if "No device" in str(e) or "Remote I/O" in str(e):
+
+            if any(keyword in self.last_failure_reason for keyword in self.CRITICAL_ERRORS):
                 self.record_failure_and_check_restart()
 
-    def reset_sensor(self):
-        self.get_logger().warn("Attempting to reset the BNO08X sensor...")
-        self.sensor_ready = False
-
-        try:
-            if self.i2c:
-                self.i2c.deinit()
-                time.sleep(0.1)
-
-            self.initialize_sensor()
-
-        except Exception as e:
-            self.get_logger().error(f"Sensor reset failed: {e}")
-            self.last_failure_reason = f"{e}"
-            if "No device" in str(e) or "Remote I/O" in str(e):
-                self.record_failure_and_check_restart()
 
     def publish_imu_data(self):
         if not self.sensor_ready:
@@ -148,6 +145,7 @@ class IMUNode(Node):
             imu_msg.orientation_covariance[0] = -1
             imu_msg.angular_velocity_covariance[0] = -1
             imu_msg.linear_acceleration_covariance[0] = -1
+
             self.imu_publisher_.publish(imu_msg)
 
             roll, pitch, yaw = self.quaternion_to_euler(quat_i, quat_j, quat_k, quat_real)
@@ -162,17 +160,15 @@ class IMUNode(Node):
             heading_msg.data = f'Heading: {self.yaw_to_cardinal(heading_degrees)}, {heading_degrees:.2f} degrees'
             self.heading_publisher_.publish(heading_msg)
 
-            # On successful read, clear failures and report OK
             if self.failure_timestamps:
                 self.failure_timestamps.clear()
                 self.publish_health_status("IMU OK")
 
         except Exception as e:
+            self.last_failure_reason = str(e)
             self.get_logger().error(f"Sensor read error: {e}")
-            self.last_failure_reason = f"{e}"
-            error_str = str(e)
-            critical_errors = ["Remote I/O", "No device", "Input/output error", "Unprocessable Batch bytes"]
-            if any(err in error_str for err in critical_errors) or error_str in ['123', '0']:
+
+            if any(keyword in self.last_failure_reason for keyword in self.CRITICAL_ERRORS):
                 self.get_logger().warn(f"Critical failure detected: {e}")
                 self.record_failure_and_check_restart()
             else:
