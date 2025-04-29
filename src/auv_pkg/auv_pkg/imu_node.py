@@ -49,6 +49,7 @@ class IMUNode(Node):
     def restart_process(self):
         self.publish_health_status("IMU RESTARTING")
         self.get_logger().error("IMU node restarting itself now...")
+        time.sleep(0.2)
         python = sys.executable
         os.execv(python, [python] + sys.argv)
 
@@ -96,14 +97,18 @@ class IMUNode(Node):
             self.bno = BNO08X_I2C(self.i2c, address=0x4B)
 
             # Try enabling features one by one
+            time.sleep(0.2)
             try:
                 self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                time.sleep(0.1)
                 self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                time.sleep(0.1)
                 self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                time.sleep(0.1)
             except Exception as feature_e:
                 self.get_logger().error(f"Critical error enabling feature: {feature_e}")
                 self.last_failure_reason = str(feature_e)
-                self.restart_process()  # 🔥 Immediate restart
+                self.restart_process()  #  Immediate restart
                 return
 
             time.sleep(0.5)
@@ -131,6 +136,13 @@ class IMUNode(Node):
             accel_x, accel_y, accel_z = self.bno.acceleration
             gyro_x, gyro_y, gyro_z = self.bno.gyro
 
+            # === Data Validation ===
+            if not self.validate_imu_data(quat_i, quat_j, quat_k, quat_real, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z):
+                self.get_logger().warn("Invalid IMU data detected. Skipping publish.")
+                self.publish_health_status("IMU HICCUP | Invalid sensor data detected")
+                return
+
+            # === Publish valid data ===
             imu_msg = Imu()
             imu_msg.orientation.x = quat_i
             imu_msg.orientation.y = quat_j
@@ -160,8 +172,8 @@ class IMUNode(Node):
             heading_msg.data = f'Heading: {self.yaw_to_cardinal(heading_degrees)}, {heading_degrees:.2f} degrees'
             self.heading_publisher_.publish(heading_msg)
 
-            if self.failure_timestamps:
-                self.failure_timestamps.clear()
+            # === Recovery Health Reporting ===
+            if self.last_health_status != "IMU OK":
                 self.publish_health_status("IMU OK")
 
         except Exception as e:
@@ -172,7 +184,8 @@ class IMUNode(Node):
                 self.get_logger().warn(f"Critical failure detected: {e}")
                 self.record_failure_and_check_restart()
             else:
-                self.get_logger().info(f"Non-critical sensor hiccup: {e}")
+                self.publish_health_status(f"IMU HICCUP | Last error: {self.last_failure_reason}")
+
 
     def quaternion_to_euler(self, x, y, z, w):
         t0 = +2.0 * (w * x + y * z)
@@ -190,6 +203,25 @@ class IMUNode(Node):
         directions = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West']
         index = round(heading_degrees / 45.0) % 8
         return directions[index]
+    
+    def validate_imu_data(self, qi, qj, qk, qr, ax, ay, az, gx, gy, gz):
+        # Validate quaternion: check near unit length
+        quat_norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
+        if abs(quat_norm - 1.0) > 0.2:  # Allow small error
+            return False
+
+        # Validate acceleration: magnitude reasonable (Earth gravity ~9.8 m/s²)
+        accel_magnitude = math.sqrt(ax**2 + ay**2 + az**2)
+        if accel_magnitude < 5.0 or accel_magnitude > 20.0:  # Accept 5-20 m/s² range
+            return False
+
+        # Validate gyro: unrealistic spin rates (e.g., > 2000 deg/s) should not happen
+        gyro_threshold = math.radians(2000)  # ~35 rad/s
+        if any(abs(g) > gyro_threshold for g in [gx, gy, gz]):
+            return False
+
+        return True
+
 
 def main(args=None):
     rclpy.init(args=args)
