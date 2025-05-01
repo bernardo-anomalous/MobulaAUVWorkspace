@@ -34,8 +34,8 @@ class WingRollController(Node):
         self.current_roll = 0.0
 
         # Servo limits
-        self.min_angle = 0.0
-        self.max_angle = 60.0
+        self.min_angle = 40.0
+        self.max_angle = 140.0
 
         # Activation flag
         self.pid_active = True
@@ -123,9 +123,15 @@ class WingRollController(Node):
         # Apply recovery ramp factor here for smooth re-entry
         correction_roll *= self.recovery_factor
 
-        # Servo angle adjustments based on roll correction
-        left_wing_angle = 30.0 + (correction_roll / self.correction_limit_roll) * 30.0
-        right_wing_angle = 30.0 + (correction_roll / self.correction_limit_roll) * 30.0
+        # Servo range config
+        self.min_angle = 40.0
+        self.max_angle = 140.0
+        center_angle = 90.0
+        max_correction = 50.0  # max deviation from center in either direction
+
+        # Scaled correction applied around center
+        left_wing_angle = center_angle + (correction_roll / self.correction_limit_roll) * max_correction
+        right_wing_angle = center_angle + (correction_roll / self.correction_limit_roll) * max_correction
 
         # Clamp servo angles
         left_wing_angle = max(self.min_angle, min(self.max_angle, left_wing_angle))
