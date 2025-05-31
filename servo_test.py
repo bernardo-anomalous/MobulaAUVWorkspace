@@ -6,7 +6,7 @@ import board
 
 # === Presets ===
 PRESETS = {
-    "glide": [90.0, 90.0, 90.0, 90.0, 90.0, 90.0],
+    "glide": [90.0, 135.0, 90.0, 135.0, 90.0, 90.0],
     "zero":  [0.0,  0.0,  0.0,  0.0,  0.0,  0.0],
     "fold":  [45.0, 45.0, 45.0, 45.0, 45.0, 45.0],
 }
@@ -22,10 +22,10 @@ class ServoTestNode:
         self.pca.frequency = 100
         
         self.servos = {
-            0: Servo(self.pca.channels[0], min_pulse=400, max_pulse=2500),
-            1: Servo(self.pca.channels[1], min_pulse=400, max_pulse=2500),
-            2: Servo(self.pca.channels[2], min_pulse=400, max_pulse=2500),
-            3: Servo(self.pca.channels[3], min_pulse=400, max_pulse=2500),
+            0: Servo(self.pca.channels[0], min_pulse=500, max_pulse=2500),
+            1: Servo(self.pca.channels[1], min_pulse=500, max_pulse=2500),
+            2: Servo(self.pca.channels[2], min_pulse=500, max_pulse=2500),
+            3: Servo(self.pca.channels[3], min_pulse=500, max_pulse=2500),
             4: Servo(self.pca.channels[4], min_pulse=500, max_pulse=2500),
             5: Servo(self.pca.channels[5], min_pulse=500, max_pulse=2500),
         }
