@@ -21,7 +21,7 @@ class ServoDriverNode(LifecycleNode):
         self.get_logger().info('Servo Driver Node initialized.')
 
         # Parameters
-        self.declare_parameter('glide_position', [60.0, 90.0, 60.0, 90.0, 90.0, 90.0])
+        self.declare_parameter('glide_position', [90.0, 90.0, 90.0, 90.0, 90.0, 90.0])
         self.declare_parameter('update_rate_hz', 30.0)
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)
@@ -125,11 +125,12 @@ class ServoDriverNode(LifecycleNode):
                 i2c = board.I2C()
                 self.pca = PCA9685(i2c)
                 self.pca.frequency = 60
+                time.sleep(2.0)
                 self.servos = {
-                    0: Servo(self.pca.channels[0], min_pulse=400, max_pulse=2500),
-                    1: Servo(self.pca.channels[1], min_pulse=400, max_pulse=2500),
-                    2: Servo(self.pca.channels[2], min_pulse=400, max_pulse=2500),
-                    3: Servo(self.pca.channels[3], min_pulse=400, max_pulse=2500),
+                    0: Servo(self.pca.channels[0], min_pulse=500, max_pulse=2500),
+                    1: Servo(self.pca.channels[1], min_pulse=500, max_pulse=2500),
+                    2: Servo(self.pca.channels[2], min_pulse=500, max_pulse=2500),
+                    3: Servo(self.pca.channels[3], min_pulse=500, max_pulse=2500),
                     4: Servo(self.pca.channels[4], min_pulse=500, max_pulse=2500),
                     5: Servo(self.pca.channels[5], min_pulse=500, max_pulse=2500),
                 }

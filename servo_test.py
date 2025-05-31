@@ -6,7 +6,7 @@ import board
 
 # === Presets ===
 PRESETS = {
-    "glide": [60.0, 90.0, 60.0, 90.0, 90.0, 90.0],
+    "glide": [90.0, 90.0, 90.0, 90.0, 90.0, 90.0],
     "zero":  [0.0,  0.0,  0.0,  0.0,  0.0,  0.0],
     "fold":  [45.0, 45.0, 45.0, 45.0, 45.0, 45.0],
 }
@@ -14,11 +14,13 @@ PRESETS = {
 ANGLE_MIN = 0.0
 ANGLE_MAX = 270.0
 
+
 class ServoTestNode:
     def __init__(self):
         self.i2c = board.I2C()
         self.pca = PCA9685(self.i2c)
         self.pca.frequency = 100
+        
         self.servos = {
             0: Servo(self.pca.channels[0], min_pulse=400, max_pulse=2500),
             1: Servo(self.pca.channels[1], min_pulse=400, max_pulse=2500),
@@ -27,6 +29,7 @@ class ServoTestNode:
             4: Servo(self.pca.channels[4], min_pulse=500, max_pulse=2500),
             5: Servo(self.pca.channels[5], min_pulse=500, max_pulse=2500),
         }
+
         self.current_angles = [90.0] * 6  # Default hold
         self.sweep_thread = None
         self.sweep_active = False

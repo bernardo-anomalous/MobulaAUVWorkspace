@@ -101,7 +101,7 @@ class IMUNode(Node):
             try:
                 self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
                 time.sleep(0.1)
-                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)#if error to enable feature, comment here and run script again, then uncomment and run again.
                 time.sleep(0.1)
                 self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
                 time.sleep(0.1)
