@@ -6,9 +6,9 @@ import board
 
 # === Presets ===
 PRESETS = {
-    "glide": [90.0, 135.0, 90.0, 135.0, 90.0, 90.0],
-    "zero":  [0.0,  0.0,  0.0,  0.0,  0.0,  0.0],
-    "fold":  [45.0, 45.0, 45.0, 45.0, 45.0, 45.0],
+    "glide": [90.0, 135.0, 90.0, 135.0, 90.0, 90.0],# left main, left pitch, right main, right pitch, tail 1, tail 2
+    "up":  [0.0,  180.0,  180.0,  90.0,  90.0,  90.0],#swing up full pitch
+    "down":  [180.0, 90.0, 0.0, 180.0, 90.0, 90.0],#swing down full pitch
 }
 
 ANGLE_MIN = 0.0
@@ -30,7 +30,7 @@ class ServoTestNode:
             5: Servo(self.pca.channels[5], min_pulse=500, max_pulse=2500),
         }
 
-        self.current_angles = [90.0] * 6  # Default hold
+        self.current_angles = [90.0, 135.0, 90.0, 135.0]  # Default hold
         self.sweep_thread = None
         self.sweep_active = False
         self.manual_mode = False
@@ -125,8 +125,12 @@ class ServoTestNode:
                 self.step_size += 1.0
             elif key == '-':
                 self.step_size = max(1.0, self.step_size - 1.0)
-            elif key == 'g':
+            elif key == 'k':
                 self.move_to_preset("glide")
+            elif key == 'j':
+                self.move_to_preset("up")
+            elif key == 'l':
+                self.move_to_preset("down")
             elif key == 'q':
                 self.manual_mode = False
                 break
