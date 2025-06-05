@@ -103,7 +103,7 @@ class IMUNode(Node):
                 time.sleep(0.1)
                 #self.bno.enable_feature(BNO_REPORT_GYROSCOPE)#if error to enable feature, comment here and run script again, then uncomment and run again.
                 time.sleep(0.1)
-                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                #self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
                 time.sleep(0.1)
             except Exception as feature_e:
                 self.get_logger().error(f"Critical error enabling feature: {feature_e}")

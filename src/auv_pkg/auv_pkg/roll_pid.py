@@ -34,8 +34,8 @@ class WingRollController(Node):
         self.current_roll = 0.0
 
         # Servo limits
-        self.min_angle = 40.0
-        self.max_angle = 140.0
+        self.min_angle = 90.0
+        self.max_angle = 180.0
 
         # Activation flag
         self.pid_active = True
@@ -124,9 +124,9 @@ class WingRollController(Node):
         correction_roll *= self.recovery_factor
 
         # Servo range config
-        self.min_angle = 40.0
-        self.max_angle = 140.0
-        center_angle = 90.0
+        self.min_angle = 90.0
+        self.max_angle = 180.0
+        center_angle = 135.0
         max_correction = 50.0  # max deviation from center in either direction
 
         # Scaled correction applied around center
