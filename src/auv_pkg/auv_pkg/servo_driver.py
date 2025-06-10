@@ -42,6 +42,7 @@ class ServoDriverNode(LifecycleNode):
         self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
         self.last_published_status = None
         self.executing_movement = False
+        self._publish_busy_status("starting up")
 
         # Failure tracking
         self.failure_timestamps = deque()
@@ -130,6 +131,7 @@ class ServoDriverNode(LifecycleNode):
         self.angles_publisher = self.create_publisher(Float32MultiArray, 'current_servo_angles', 10)
         self.heartbeat_publisher = self.create_publisher(String, 'servo_driver/heartbeat', 10)
         self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
+        self._publish_busy_status("configuring")
 
         try:
             # === Load Parameters ===
@@ -177,6 +179,7 @@ class ServoDriverNode(LifecycleNode):
         self.heartbeat_timer = self.create_timer(1.0, self._publish_heartbeat)  # 1 Hz heartbeat
 
         self.start_refresh_loop()
+        self._publish_busy_status("activated")
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
