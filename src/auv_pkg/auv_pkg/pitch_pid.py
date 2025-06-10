@@ -82,6 +82,9 @@ class TailPitchRollController(Node):
         self.recovery_factor = 0.0   # Starts at zero, ramps up to 1.0
         self.recovery_rate = 0.05    # Ramp speed for recovery
         self.imu_data_valid = False
+
+        # Timestamp for PID update calculations
+        self.last_update_time = self.get_clock().now()
         
                 # Pitch scaling factors for asymmetric tail response
         self.left_pitch_scale = (90.0 - self.servo_limits[4]["min"])
@@ -128,7 +131,8 @@ class TailPitchRollController(Node):
 
         # Time calculations
         current_time = self.get_clock().now()
-        dt = (current_time.nanoseconds / 1e9)
+        dt = (current_time - self.last_update_time).nanoseconds / 1e9
+        self.last_update_time = current_time
         if dt <= 0:
             return
 

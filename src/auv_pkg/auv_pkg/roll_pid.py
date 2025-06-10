@@ -58,6 +58,9 @@ class WingRollController(Node):
         self.recovery_rate = 0.05   # Speed of ramp-up (tune this value)
         self.imu_data_valid = False
 
+        # Timestamp for PID update calculations
+        self.last_update_time = self.get_clock().now()
+
 
         self.get_logger().info('Wing Roll Controller Node Initialized')
 
@@ -102,7 +105,8 @@ class WingRollController(Node):
 
         # Time calculations
         current_time = self.get_clock().now()
-        dt = (current_time.nanoseconds / 1e9)
+        dt = (current_time - self.last_update_time).nanoseconds / 1e9
+        self.last_update_time = current_time
         if dt <= 0:
             return
 
