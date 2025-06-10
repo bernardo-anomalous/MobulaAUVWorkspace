@@ -31,6 +31,7 @@ class ServoDriverNode(LifecycleNode):
         self.pca = None
         self.servos = {}
         self.current_angles = []
+        self.angle_tolerance_deg = 1.0  # Minimum change needed to update servo
         self.last_target_angles = [90.0] * 6
 
         self.angles_publisher = None
@@ -73,19 +74,36 @@ class ServoDriverNode(LifecycleNode):
         self.get_logger().info(f"Started refresh loop at {update_rate_hz} Hz.")
 
     def refresh_servo_positions(self):
-        if not self.simulation_mode:
-            try:
-                with self.target_lock:
-                    target_angles_copy = self.last_target_angles.copy()
+        try:
+            with self.target_lock:
+                target_angles_copy = self.last_target_angles.copy()
 
-                for servo_number, target_angle in enumerate(target_angles_copy):
-                    if servo_number in self.servos:
-                        self.servos[servo_number].angle = target_angle
+            for servo_number, target_angle in enumerate(target_angles_copy):
+                if servo_number in self.servos:
+                    last_angle = (
+                        self.current_angles[servo_number]
+                        if servo_number < len(self.current_angles)
+                        else None
+                    )
+                    if (
+                        last_angle is None
+                        or abs(last_angle - target_angle) > self.angle_tolerance_deg
+                    ):
+                        if not self.simulation_mode:
+                            self.servos[servo_number].angle = target_angle
+                        if servo_number < len(self.current_angles):
+                            self.current_angles[servo_number] = target_angle
+                        else:
+                            # Extend list if new servo index encountered
+                            self.current_angles.extend(
+                                [0.0] * (servo_number + 1 - len(self.current_angles))
+                            )
+                            self.current_angles[servo_number] = target_angle
 
-            except Exception as e:
-                self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
-                if "Remote I/O" in str(e) or "No device" in str(e):
-                    self.record_failure_and_check_restart()
+        except Exception as e:
+            self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
+            if "Remote I/O" in str(e) or "No device" in str(e):
+                self.record_failure_and_check_restart()
                     
     def move_servos_to_glide_position(self):
         glide_position = self.get_parameter('glide_position').value
@@ -221,7 +239,7 @@ class ServoDriverNode(LifecycleNode):
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
         with self.target_lock:
-            angles_msg.data = self.last_target_angles.copy()
+            angles_msg.data = self.current_angles.copy()
 
         self.angles_publisher.publish(angles_msg)
 
