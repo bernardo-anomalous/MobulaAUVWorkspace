@@ -12,6 +12,8 @@ from geometry_msgs.msg import Vector3
 import math
 import time
 
+from .utils import quaternion_to_euler
+
 class IMUNode(Node):
     def __init__(self):
         super().__init__('bno080_imu_node')
@@ -64,7 +66,7 @@ class IMUNode(Node):
             self.get_logger().info('Publishing IMU data')
 
             # Calculate roll, pitch, and yaw from quaternion
-            roll, pitch, yaw = self.quaternion_to_euler(quat.x, quat.y, quat.z, quat.w)
+            roll, pitch, yaw = quaternion_to_euler(quat.x, quat.y, quat.z, quat.w)
 
             # Publish roll, pitch, and yaw to the imu/euler topic
             euler_msg = Vector3()
@@ -92,27 +94,6 @@ class IMUNode(Node):
             self.heading_value_publisher_.publish(heading_value_msg)
             self.get_logger().info(f'Publishing Heading Value - {heading_degrees:.2f} degrees')
 
-    def quaternion_to_euler(self, x, y, z, w):
-        # Convert quaternion to roll, pitch, yaw
-        t0 = +2.0 * (w * x + y * z)
-        t1 = +1.0 - 2.0 * (x * x + y * y)
-        roll = math.atan2(t0, t1)
-
-        t2 = +2.0 * (w * y - z * x)
-        t2 = +1.0 if t2 > +1.0 else t2
-        t2 = -1.0 if t2 < -1.0 else t2
-        pitch = math.asin(t2)
-
-        t3 = +2.0 * (w * z + x * y)
-        t4 = +1.0 - 2.0 * (y * y + z * z)
-        yaw = math.atan2(t3, t4)
-
-        # Convert radians to degrees
-        roll = math.degrees(roll)
-        pitch = math.degrees(pitch)
-        yaw = math.degrees(yaw)
-
-        return roll, pitch, yaw
 
     def yaw_to_cardinal(self, yaw):
         # Convert yaw angle to cardinal direction

@@ -15,6 +15,8 @@ import os
 import sys
 from collections import deque
 
+from .utils import quaternion_to_euler
+
 class IMUNode(Node):
     def __init__(self):
         super().__init__('imu_node_fixing')
@@ -160,7 +162,7 @@ class IMUNode(Node):
 
             self.imu_publisher_.publish(imu_msg)
 
-            roll, pitch, yaw = self.quaternion_to_euler(quat_i, quat_j, quat_k, quat_real)
+            roll, pitch, yaw = quaternion_to_euler(quat_i, quat_j, quat_k, quat_real)
             rpy_msg = Vector3()
             rpy_msg.x = roll
             rpy_msg.y = pitch
@@ -187,17 +189,6 @@ class IMUNode(Node):
                 self.publish_health_status(f"IMU HICCUP | Last error: {self.last_failure_reason}")
 
 
-    def quaternion_to_euler(self, x, y, z, w):
-        t0 = +2.0 * (w * x + y * z)
-        t1 = +1.0 - 2.0 * (x * x + y * y)
-        roll = math.atan2(t0, t1)
-        t2 = +2.0 * (w * y - z * x)
-        t2 = max(min(t2, 1.0), -1.0)
-        pitch = -math.asin(t2)
-        t3 = +2.0 * (w * z + x * y)
-        t4 = +1.0 - 2.0 * (y * y + z * z)
-        yaw = math.atan2(t3, t4)
-        return math.degrees(roll), math.degrees(pitch), math.degrees(yaw)
 
     def yaw_to_cardinal(self, heading_degrees):
         directions = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West']
