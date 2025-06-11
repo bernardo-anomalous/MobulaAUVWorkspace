@@ -46,6 +46,11 @@ class ServoDriverNode(LifecycleNode):
         self.executing_movement = False
         self._publish_busy_status("starting up")
 
+        # Lifecycle state tracking
+        self.lifecycle_state_publisher = self.create_publisher(String, 'servo_driver/lifecycle_state', 10)
+        self.last_lifecycle_state = 'unconfigured'
+        self.lifecycle_state_timer = self.create_timer(2.0, self._publish_lifecycle_state)
+
         # Failure tracking
         self.failure_timestamps = deque()
         self.max_failures = 3
@@ -208,12 +213,16 @@ class ServoDriverNode(LifecycleNode):
                 ServoMovementCommand, 'tail_commands', self._servo_command_callback, 10)
 
             self.get_logger().info('Configuration successful.')
+            self.last_lifecycle_state = 'inactive'
+            self._publish_lifecycle_state()
             return TransitionCallbackReturn.SUCCESS
 
         except Exception as e:
             self.get_logger().error(f'Failed to configure hardware: {e}')
             if "Remote I/O" in str(e) or "No device" in str(e):
                 self.record_failure_and_check_restart()
+            self.last_lifecycle_state = 'unconfigured'
+            self._publish_lifecycle_state()
             return TransitionCallbackReturn.FAILURE
 
 
@@ -223,6 +232,8 @@ class ServoDriverNode(LifecycleNode):
 
         self.start_refresh_loop()
         self._publish_busy_status("activated")
+        self.last_lifecycle_state = 'active'
+        self._publish_lifecycle_state()
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
@@ -241,6 +252,8 @@ class ServoDriverNode(LifecycleNode):
                 self.get_logger().info('PWM signals stopped. Servos should be limp (if supported by model).')
             except Exception as e:
                 self.get_logger().error(f'Error while setting duty cycles to 0: {e}')
+        self.last_lifecycle_state = 'inactive'
+        self._publish_lifecycle_state()
         return TransitionCallbackReturn.SUCCESS
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
@@ -254,6 +267,8 @@ class ServoDriverNode(LifecycleNode):
             except Exception:
                 pass
             self.i2c = None
+        self.last_lifecycle_state = 'unconfigured'
+        self._publish_lifecycle_state()
         return TransitionCallbackReturn.SUCCESS
 
     def _servo_command_callback(self, msg: ServoMovementCommand):
@@ -299,6 +314,11 @@ class ServoDriverNode(LifecycleNode):
         heartbeat_msg = String()
         heartbeat_msg.data = 'alive'
         self.heartbeat_publisher.publish(heartbeat_msg)
+
+    def _publish_lifecycle_state(self):
+        state_msg = String()
+        state_msg.data = self.last_lifecycle_state
+        self.lifecycle_state_publisher.publish(state_msg)
 
     def _publish_busy_status(self, status_message: str):
         if status_message != self.last_published_status:
