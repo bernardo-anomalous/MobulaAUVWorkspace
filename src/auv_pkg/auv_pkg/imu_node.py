@@ -111,18 +111,21 @@ class IMUNode(Node):
             else:
                 self.get_logger().fatal(
                     f"Restart after {self.reset_attempts} soft reset attempts")
-                self.publish_health_status(
-                    f"IMU RESTARTING | Reason: {self.last_failure_reason}")
+                # Request a restart and report health status once
+                self.publish_health_status("IMU RESTARTING")
                 time.sleep(2)
                 self.restart_process()
         else:
             self.publish_health_status(f"IMU UNSTABLE ({failure_count} failures in last {self.failure_window_seconds} sec)")
 
     def publish_health_status(self, status):
+        """Publish a health message when it has changed."""
         message_text = status
-        if "UNSTABLE" in status and self.last_failure_reason:
+        if "UNSTABLE" in status and "Last error" not in status \
+                and self.last_failure_reason:
             message_text += f" | Last error: {self.last_failure_reason}"
-        elif "RESTARTING" in status and self.last_failure_reason:
+        elif "RESTARTING" in status and "Reason:" not in status \
+                and self.last_failure_reason:
             message_text += f" | Reason: {self.last_failure_reason}"
 
         if message_text != self.last_health_status:
