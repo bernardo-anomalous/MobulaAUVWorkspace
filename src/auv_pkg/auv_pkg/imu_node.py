@@ -33,6 +33,7 @@ class IMUNode(Node):
         self.last_failure_reason = None
 
         self.timer = self.create_timer(0.1, self.publish_imu_data)  # 10 Hz
+        self.retry_timer = self.create_timer(5.0, self._retry_init_if_needed)
 
         self.i2c = None
         self.bno = None
@@ -98,14 +99,20 @@ class IMUNode(Node):
 
         if failure_count >= self.max_failures:
             self.get_logger().error(
-                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Attempting soft reset...")
+                f"Exceeded {self.max_failures} failures within "
+                f"{self.failure_window_seconds} seconds.")
             if self.reset_attempts < self.max_reset_attempts and self.reset_i2c_bus():
+                self.reset_attempts += 1
+                self.get_logger().info(
+                    f"Soft reset attempt {self.reset_attempts}/"
+                    f"{self.max_reset_attempts} successful")
                 self.publish_health_status("IMU SOFT RESET")
                 self.failure_timestamps.clear()
-                self.reset_attempts += 1
             else:
-                self.publish_health_status(f"IMU RESTARTING | Reason: {self.last_failure_reason}")
-                self.get_logger().fatal("Soft reset failed or limit reached. Restarting process...")
+                self.get_logger().fatal(
+                    f"Restart after {self.reset_attempts} soft reset attempts")
+                self.publish_health_status(
+                    f"IMU RESTARTING | Reason: {self.last_failure_reason}")
                 time.sleep(2)
                 self.restart_process()
         else:
@@ -124,6 +131,11 @@ class IMUNode(Node):
             self.health_status_publisher.publish(status_msg)
             self.get_logger().info(f"[IMU Health] {message_text}")
             self.last_health_status = message_text
+
+    def _retry_init_if_needed(self):
+        if self.sensor_ready:
+            return
+        self.record_failure_and_check_restart()
 
     def initialize_sensor(self):
         self.get_logger().info("Initializing BNO08X sensor...")
