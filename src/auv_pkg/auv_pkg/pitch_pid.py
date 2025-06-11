@@ -17,12 +17,12 @@ class TailPitchRollController(Node):
         self.kp_pitch = 1.5
         self.ki_pitch = 0.03
         # Slightly smaller derivative gain to reduce jitter
-        self.kd_pitch = 0.5
+        self.kd_pitch = 0.01
 
         # PID Coefficients for Roll
         self.kp_roll = 2.0  # Increased proportional gain for roll
         self.ki_roll = 0.05  # Increased integral gain for stronger adjustments
-        self.kd_roll = 0.7  # Slightly reduced derivative gain for smoother roll
+        self.kd_roll = 0.01  # Slightly reduced derivative gain for smoother roll
 
         # Overcompensation factor for pitch
         self.overcompensation_factor_pitch = 2.0
@@ -45,8 +45,8 @@ class TailPitchRollController(Node):
 
         # Damping factors
         # Increased damping factors help smooth out servo oscillations
-        self.damping_factor_pitch = 0.7
-        self.damping_factor_roll = 0.6
+        self.damping_factor_pitch = 0.8
+        self.damping_factor_roll = 0.8
 
         # Previous corrections
         self.previous_correction_pitch = 0.0

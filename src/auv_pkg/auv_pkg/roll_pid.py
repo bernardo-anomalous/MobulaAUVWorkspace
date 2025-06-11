@@ -14,7 +14,7 @@ class WingRollController(Node):
         self.kp_roll = 2.0  # Proportional gain
         self.ki_roll = 0.05  # Integral gain
         # Slightly smaller derivative gain helps minimize oscillations
-        self.kd_roll = 0.7
+        self.kd_roll = 0.01 #deduce to smooth out the reaction
 
         # PID state for Roll
         self.integral_error_roll = 0.0
@@ -27,7 +27,7 @@ class WingRollController(Node):
         self.correction_limit_roll = 25.0
 
         # Damping factor for smooth roll corrections (increase for less jitter)
-        self.damping_factor_roll = 0.6
+        self.damping_factor_roll = 0.8
         self.previous_correction_roll = 0.0
 
         # Target and current values
