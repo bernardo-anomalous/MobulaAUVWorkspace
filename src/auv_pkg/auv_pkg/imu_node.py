@@ -42,9 +42,12 @@ class IMUNode(Node):
         self.failure_window_seconds = 30
 
         self.CRITICAL_ERRORS = [
-            "No device", "Remote I/O", "Input/output error", 
+            "No device", "Remote I/O", "Input/output error",
             "Unprocessable Batch bytes", "Was not able to enable feature"
         ]
+
+        self.reset_attempts = 0
+        self.max_reset_attempts = 3
 
         self.initialize_sensor()
 
@@ -54,6 +57,35 @@ class IMUNode(Node):
         time.sleep(0.2)
         python = sys.executable
         os.execv(python, [python] + sys.argv)
+
+    def reset_i2c_bus(self) -> bool:
+        self.get_logger().error("Attempting soft I2C reset...")
+        try:
+            if self.i2c:
+                try:
+                    self.i2c.deinit()
+                except Exception as e:
+                    self.get_logger().error(f"Error deinitializing I2C: {e}")
+            time.sleep(0.1)
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.bno = BNO08X_I2C(self.i2c, address=0x4B)
+            time.sleep(0.2)
+            try:
+                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                time.sleep(0.1)
+                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                time.sleep(0.1)
+                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            except Exception as fe:
+                self.get_logger().error(f"Critical error enabling feature: {fe}")
+                return False
+            self.sensor_ready = True
+            self.get_logger().error("Soft reset successful.")
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Soft reset failed: {e}")
+            self.sensor_ready = False
+            return False
 
     def record_failure_and_check_restart(self):
         current_time = time.time()
@@ -65,11 +97,17 @@ class IMUNode(Node):
         failure_count = len(self.failure_timestamps)
 
         if failure_count >= self.max_failures:
-            self.publish_health_status(f"IMU RESTARTING | Reason: {self.last_failure_reason}")
-            self.get_logger().fatal(
-                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Restarting process...")
-            time.sleep(2)
-            self.restart_process()
+            self.get_logger().error(
+                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Attempting soft reset...")
+            if self.reset_attempts < self.max_reset_attempts and self.reset_i2c_bus():
+                self.publish_health_status("IMU SOFT RESET")
+                self.failure_timestamps.clear()
+                self.reset_attempts += 1
+            else:
+                self.publish_health_status(f"IMU RESTARTING | Reason: {self.last_failure_reason}")
+                self.get_logger().fatal("Soft reset failed or limit reached. Restarting process...")
+                time.sleep(2)
+                self.restart_process()
         else:
             self.publish_health_status(f"IMU UNSTABLE ({failure_count} failures in last {self.failure_window_seconds} sec)")
 
