@@ -8,6 +8,7 @@ from auv_custom_interfaces.msg import ServoMovementCommand
 from adafruit_motor.servo import Servo
 from adafruit_pca9685 import PCA9685
 import board
+import busio
 import os
 import sys
 import time
@@ -28,6 +29,7 @@ class ServoDriverNode(LifecycleNode):
 
         self.simulation_mode = False
         self.debug_logging = False
+        self.i2c = None
         self.pca = None
         self.servos = {}
         self.current_angles = []
@@ -49,12 +51,48 @@ class ServoDriverNode(LifecycleNode):
         self.max_failures = 3
         self.failure_window_seconds = 30  # Restart if 3 failures occur within 30 seconds
         self.target_lock = threading.Lock()
+        self.reset_attempts = 0
+        self.max_reset_attempts = 3
 
 
     def restart_process(self):
         self.get_logger().error("Servo Driver Node restarting itself now...")
         python = sys.executable
         os.execv(python, [python] + sys.argv)
+
+    def reset_i2c_bus(self) -> bool:
+        self.get_logger().error("Attempting soft I2C reset...")
+        try:
+            if self.pca:
+                try:
+                    self.pca.deinit()
+                except Exception as e:
+                    self.get_logger().error(f"Error deinitializing PCA9685: {e}")
+            if self.i2c:
+                try:
+                    self.i2c.deinit()
+                except Exception as e:
+                    self.get_logger().error(f"Error deinitializing I2C: {e}")
+            time.sleep(0.1)
+
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.pca = PCA9685(self.i2c)
+            self.pca.frequency = 60
+            time.sleep(0.5)
+            self.servos = {
+                0: Servo(self.pca.channels[0], min_pulse=500, max_pulse=2500),
+                1: Servo(self.pca.channels[1], min_pulse=500, max_pulse=2500),
+                2: Servo(self.pca.channels[2], min_pulse=500, max_pulse=2500),
+                3: Servo(self.pca.channels[3], min_pulse=500, max_pulse=2500),
+                4: Servo(self.pca.channels[4], min_pulse=500, max_pulse=2500),
+                5: Servo(self.pca.channels[5], min_pulse=500, max_pulse=2500),
+            }
+            self.move_servos_to_glide_position()
+            self.get_logger().error("Soft reset successful.")
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Soft reset failed: {e}")
+            return False
 
     def record_failure_and_check_restart(self):
         current_time = time.time()
@@ -63,11 +101,16 @@ class ServoDriverNode(LifecycleNode):
             self.failure_timestamps.popleft()
 
         if len(self.failure_timestamps) >= self.max_failures:
-            self.get_logger().fatal(
-                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Restarting process..."
+            self.get_logger().error(
+                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds. Attempting soft reset..."
             )
-            time.sleep(2)
-            self.restart_process()
+            if self.reset_attempts < self.max_reset_attempts and self.reset_i2c_bus():
+                self.failure_timestamps.clear()
+                self.reset_attempts += 1
+            else:
+                self.get_logger().fatal("Soft reset failed or limit reached. Restarting process...")
+                time.sleep(2)
+                self.restart_process()
 
     def start_refresh_loop(self):
         update_rate_hz = self.get_parameter('update_rate_hz').value
@@ -142,8 +185,8 @@ class ServoDriverNode(LifecycleNode):
                 self.get_logger().info('Simulation mode enabled. No hardware will be initialized.')
             else:
                 self.get_logger().info('Initializing hardware...')
-                i2c = board.I2C()
-                self.pca = PCA9685(i2c)
+                self.i2c = busio.I2C(board.SCL, board.SDA)
+                self.pca = PCA9685(self.i2c)
                 self.pca.frequency = 60
                 time.sleep(2.0)
                 self.servos = {
@@ -205,6 +248,12 @@ class ServoDriverNode(LifecycleNode):
         if not self.simulation_mode and self.pca:
             self.pca.deinit()
             self.pca = None
+        if self.i2c:
+            try:
+                self.i2c.deinit()
+            except Exception:
+                pass
+            self.i2c = None
         return TransitionCallbackReturn.SUCCESS
 
     def _servo_command_callback(self, msg: ServoMovementCommand):
