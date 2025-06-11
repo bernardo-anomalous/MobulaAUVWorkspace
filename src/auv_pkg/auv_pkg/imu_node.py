@@ -146,9 +146,12 @@ class IMUNode(Node):
                 self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
                 time.sleep(0.1)
             except Exception as feature_e:
-                self.get_logger().error(f"Critical error enabling feature: {feature_e}")
+                self.get_logger().error(
+                    f"Critical error enabling feature: {feature_e}")
                 self.last_failure_reason = str(feature_e)
-                self.restart_process()  #  Immediate restart
+                self.get_logger().error(
+                    "Invoking failure handler: will attempt soft reset before any restart")
+                self.record_failure_and_check_restart()
                 return
 
             time.sleep(0.5)
