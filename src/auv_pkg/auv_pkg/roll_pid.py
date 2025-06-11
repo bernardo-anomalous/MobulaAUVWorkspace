@@ -13,7 +13,8 @@ class WingRollController(Node):
         # PID Coefficients for Roll
         self.kp_roll = 2.0  # Proportional gain
         self.ki_roll = 0.05  # Integral gain
-        self.kd_roll = 0.8  # Derivative gain
+        # Slightly smaller derivative gain helps minimize oscillations
+        self.kd_roll = 0.7
 
         # PID state for Roll
         self.integral_error_roll = 0.0
@@ -25,8 +26,8 @@ class WingRollController(Node):
         # Correction clamp limit for roll
         self.correction_limit_roll = 25.0
 
-        # Damping factor for smooth roll corrections
-        self.damping_factor_roll = 0.5
+        # Damping factor for smooth roll corrections (increase for less jitter)
+        self.damping_factor_roll = 0.6
         self.previous_correction_roll = 0.0
 
         # Target and current values
@@ -36,6 +37,9 @@ class WingRollController(Node):
         # Servo limits
         self.min_angle = 90.0
         self.max_angle = 180.0
+
+        # Smoothing factor for IMU noise (tune between 0.5 and 0.9)
+        self.alpha = 0.8
 
         # Activation flag
         self.pid_active = True
@@ -68,7 +72,8 @@ class WingRollController(Node):
         self.target_roll = msg.data
 
     def imu_callback(self, msg):
-        self.current_roll = msg.x  # Assuming roll is in the x field of the IMU message
+        # Exponential smoothing to reduce IMU noise
+        self.current_roll = self.alpha * self.current_roll + (1 - self.alpha) * msg.x
         self.last_imu_time = self.get_clock().now()
         self.imu_data_valid = True
 
