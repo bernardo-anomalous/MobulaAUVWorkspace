@@ -92,6 +92,7 @@ Lifecycle node controlling the PCA9685 servo board.
 * Uses a refresh loop running at `update_rate_hz` to write servo positions to the PCA9685 board.  Only writes when the requested angle changes by more than `angle_tolerance_deg` (1° by default) to reduce I2C traffic【F:src/auv_pkg/auv_pkg/servo_driver.py†L28-L39】【F:src/auv_pkg/auv_pkg/servo_driver.py†L115-L134】.
 * On configuration it initializes hardware and subscribes to `servo_driver_commands` and `tail_commands`【F:src/auv_pkg/auv_pkg/servo_driver.py†L200-L213】.
 * Publishes servo angles on `current_servo_angles`, a heartbeat on `servo_driver/heartbeat`, busy status on `servo_driver_status`, and lifecycle state on `servo_driver/lifecycle_state`【F:src/auv_pkg/auv_pkg/servo_driver.py†L179-L184】【F:src/auv_pkg/auv_pkg/servo_driver.py†L50-L52】.
+* Adafruit `Servo` objects expect commands roughly in the 0–180° range.
 * The node can restart itself if repeated I2C errors are detected.【F:src/auv_pkg/auv_pkg/servo_driver.py†L73-L118】
 
 ### `servo_interpolation.py`
@@ -104,7 +105,7 @@ Interpolates complex movements into small servo steps.
 ### `pitch_pid.py`
 Tail pitch and roll PID controller.
 * Uses PID coefficients (`kp_pitch`, `ki_pitch`, `kd_pitch`, etc.) and damping to stabilize attitude.【F:src/auv_pkg/auv_pkg/pitch_pid.py†L13-L23】【F:src/auv_pkg/auv_pkg/pitch_pid.py†L37-L46】
-* Servo limits are stored in `servo_limits` for clamping output angles【F:src/auv_pkg/auv_pkg/pitch_pid.py†L61-L65】.
+* Servo limits stored in `servo_limits` clamp servo 4 to 30–150° and servo 5 to 60–180°【F:src/auv_pkg/auv_pkg/pitch_pid.py†L61-L65】.
 * Exponential smoothing of IMU input uses factor `alpha` (default `0.8`)【F:src/auv_pkg/auv_pkg/pitch_pid.py†L69-L69】.
 * Publishes commands to `tail_commands` and subscribes to `target_pitch`, `target_roll`, and `imu/euler`【F:src/auv_pkg/auv_pkg/pitch_pid.py†L72-L81】.
 
@@ -113,6 +114,7 @@ Wing roll PID controller.
 * Gains `kp_roll`, `ki_roll`, `kd_roll` and damping factor tune roll response【F:src/auv_pkg/auv_pkg/roll_pid.py†L9-L23】.
 * Uses smoothing factor `alpha` to filter IMU noise【F:src/auv_pkg/auv_pkg/roll_pid.py†L41-L43】.
 * Subscribes to `target_roll`, `imu/euler`, and a `wing_pid_active` flag to enable/disable control【F:src/auv_pkg/auv_pkg/roll_pid.py†L51-L54】.
+* Servo output is clamped with `min_angle` 90° and `max_angle` 180°.
 * Sends servo commands for the wing servos on `servo_driver_commands`【F:src/auv_pkg/auv_pkg/roll_pid.py†L49-L49】.
 
 ### `depth_node.py`
@@ -135,9 +137,10 @@ Provide manual control using the keyboard.
 Optional node mapping arm/hand poses to servo commands using OpenCV and MediaPipe.
 * Publishes `ServoMovementCommand` messages to `servo_driver_commands`【F:src/auv_pkg/auv_pkg/camera_control.py†L14-L17】.
 * Subscribes to `current_servo_angles` to start from the latest positions【F:src/auv_pkg/auv_pkg/camera_control.py†L16-L17】.
+* Main servos are clipped to 0–120° while pitch servos are limited to 45–135°.
 
 ### Utility and Test Scripts
-* `servo_test.py` provides a CLI to exercise servos for calibration.
+* `servo_test.py` provides a CLI to exercise servos for calibration; angles are clamped to 0–270°.
 * `pressure_sensor_test.py` reads the pressure sensor outside of ROS.
 * `fix_imu_node.py` and other backups serve as experimental versions of main nodes.
 
