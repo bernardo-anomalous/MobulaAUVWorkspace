@@ -61,8 +61,8 @@ class TailPitchRollController(Node):
         # Servo limits // replace here after running calibration 
         self.servo_limits = {
             4: {"min": 30.0, "max": 150.0},
-            5: {"min": 60.0, "max": 180.0},
-        }
+            5: {"min": 30.0, "max": 150.0},
+        }#calibration seems to show mid point for servo 4 is 70, and for servo 5 is 105, there might be a gear ration changining the ranges in reality
 
 
         # Smoothing factor for IMU noise (typical range 0.5-0.9)
@@ -178,7 +178,7 @@ class TailPitchRollController(Node):
         pitch_component_right = self.right_tail_gain * (correction_pitch / self.correction_limit_pitch) * self.right_pitch_scale
 
         # === Roll scaling adjusted to match servo ranges ===
-        roll_scale_left  = (90.0 - self.servo_limits[4]["min"])
+        roll_scale_left  = (90.0 - self.servo_limits[4]["min"])#adjusting with new mid points
         roll_scale_right = (self.servo_limits[5]["max"] - 90.0)
 
 

@@ -6,13 +6,13 @@ import board
 
 # === Presets ===
 PRESETS = {
-    "glide": [90.0, 135.0, 90.0, 135.0, 90.0, 90.0],# left main, left pitch, right main, right pitch, tail 1, tail 2
+    "glide": [90.0, 135.0, 90.0, 135.0, 70.0, 105.0],# left main, left pitch, right main, right pitch, tail 1, tail 2
     "up":  [0.0,  180.0,  180.0,  90.0,  90.0,  90.0],#swing up full pitch
     "down":  [180.0, 90.0, 0.0, 180.0, 90.0, 90.0],#swing down full pitch
 }
 
 ANGLE_MIN = 0.0
-ANGLE_MAX = 270.0
+ANGLE_MAX = 180.0
 
 
 class ServoTestNode:
