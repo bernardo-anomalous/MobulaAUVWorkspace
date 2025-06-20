@@ -162,7 +162,7 @@ Optional node mapping arm/hand poses to servo commands using OpenCV and MediaPip
 
 
 ### Utility and Test Scripts
-* `servo_test.py` provides a CLI to exercise servos for calibration; angles are clamped to 0–270°.
+* `servo_test.py` provides a CLI to exercise servos for calibration; angles are clamped to 0–180°.
 * `pressure_sensor_test.py` reads the pressure sensor outside of ROS.
 * `fix_imu_node.py` and other backups serve as experimental versions of main nodes.
 

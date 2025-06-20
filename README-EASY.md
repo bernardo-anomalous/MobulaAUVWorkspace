@@ -117,7 +117,8 @@ The launch file `mobula.launch.xml` starts nodes in this order:
 6. `depth_node`
 7. `acceleration_node`
 
-This ensures sensors are running before control loops and the servo driver are active.
+`servo_driver` is delayed slightly after the IMU initializes. Depth and acceleration
+sensors launch after the control loops.
 
 ---
 Use this quick guide when you need a high-level picture of how the Mobula AUV ROS2 system fits together.

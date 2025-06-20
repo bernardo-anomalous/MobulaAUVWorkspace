@@ -41,7 +41,7 @@ class ServoTestNode:
         print("\n=== SERVO TEST & CALIBRATION TOOL ===")
         print("---------------------------------------")
         print(" Available Commands:")
-        print("  set <servo> <angle>        → Set servo # to angle (clamped 0°–270°)")
+        print("  set <servo> <angle>        → Set servo # to angle (clamped 0°–180°)")
         print("  sweep <servo> <min> <max>  → Sweep servo between min and max angles")
         print("  stop                      → Stop sweeping")
         print("  preset <name>             → Move all servos to preset positions")
