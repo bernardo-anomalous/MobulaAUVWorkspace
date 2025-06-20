@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Vector3
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Bool
 from auv_custom_interfaces.msg import ServoMovementCommand
 
 class TailPitchRollController(Node):
@@ -52,6 +52,10 @@ class TailPitchRollController(Node):
         self.previous_correction_pitch = 0.0
         self.previous_correction_roll = 0.0
 
+        # Activation flag
+        self.pid_active = True
+        self.last_pid_active_state = True
+
         # Target and current values
         self.target_pitch = 0.0
         self.current_pitch = 0.0
@@ -75,6 +79,7 @@ class TailPitchRollController(Node):
         self.create_subscription(Float32, 'target_pitch', self.target_pitch_callback, 10)
         self.create_subscription(Float32, 'target_roll', self.target_roll_callback, 10)
         self.create_subscription(Vector3, 'imu/euler', self.imu_callback, 10)
+        self.create_subscription(Bool, 'tail_pid_active', self.pid_activation_callback, 10)
 
         # Timer for PID updates
         self.timer = self.create_timer(0.02, self.update_pid)  # Update at ~30 Hz
@@ -113,7 +118,20 @@ class TailPitchRollController(Node):
         self.last_imu_time = self.get_clock().now()
         self.imu_data_valid = True
 
+    def pid_activation_callback(self, msg):
+        self.pid_active = msg.data
+
     def update_pid(self):
+        if not self.pid_active:
+            if self.last_pid_active_state:
+                self.get_logger().info("Tail PID controllers deactivated.")
+                self.last_pid_active_state = False
+            return
+        else:
+            if not self.last_pid_active_state:
+                self.get_logger().info("Tail PID controllers activated.")
+                self.last_pid_active_state = True
+
         now = self.get_clock().now()
         time_since_last_imu = (now.nanoseconds - self.last_imu_time.nanoseconds) / 1e9
 

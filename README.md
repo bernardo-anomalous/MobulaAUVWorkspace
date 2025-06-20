@@ -107,7 +107,7 @@ Tail pitch and roll PID controller.
 * Uses PID coefficients (`kp_pitch`, `ki_pitch`, `kd_pitch`, etc.) and damping to stabilize attitude.【F:src/auv_pkg/auv_pkg/pitch_pid.py†L13-L23】【F:src/auv_pkg/auv_pkg/pitch_pid.py†L37-L46】
 * Servo limits stored in `servo_limits` clamp servo 4 to 30–150° and servo 5 to 60–180°【F:src/auv_pkg/auv_pkg/pitch_pid.py†L61-L65】.
 * Exponential smoothing of IMU input uses factor `alpha` (default `0.8`)【F:src/auv_pkg/auv_pkg/pitch_pid.py†L69-L69】.
-* Publishes commands to `tail_commands` and subscribes to `target_pitch`, `target_roll`, and `imu/euler`【F:src/auv_pkg/auv_pkg/pitch_pid.py†L72-L81】.
+* Publishes commands to `tail_commands` and subscribes to `target_pitch`, `target_roll`, `imu/euler`, and a `tail_pid_active` flag to enable/disable control【F:src/auv_pkg/auv_pkg/pitch_pid.py†L74-L83】.
 
 ### `roll_pid.py`
 Wing roll PID controller.

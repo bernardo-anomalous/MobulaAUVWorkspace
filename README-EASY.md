@@ -52,7 +52,7 @@ Below are short explanations and simple visuals for how each node affects the AU
 _____/    \_____     ____/    \____
 ```
 
-This controller reads `imu/euler` and uses PID logic to move the tail servos so the nose pitches up or down. It publishes on `tail_commands`.
+This controller reads `imu/euler` and uses PID logic to move the tail servos so the nose pitches up or down. When active (`tail_pid_active` topic) it publishes on `tail_commands`.
 
 ### `roll_pid` – stabilize the wings
 
