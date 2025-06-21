@@ -35,7 +35,10 @@ try:
             temperature_c = sensor.temperature(ms5837.UNITS_Centigrade)
 
             # Depth calculation relative to selected surface pressure
-            depth_m = (pressure_mbar - surface_pressure) / (DENSITY_SEAWATER * GRAVITY)
+            # Convert mbar -> Pa by multiplying by 100 before dividing by rho*g
+            depth_m = (
+                (pressure_mbar - surface_pressure) * 100
+            ) / (DENSITY_SEAWATER * GRAVITY)
 
             print(f"Pressure: {pressure_mbar:.2f} mbar | Temp: {temperature_c:.2f} °C | Depth: {depth_m:.3f} m")
         else:
