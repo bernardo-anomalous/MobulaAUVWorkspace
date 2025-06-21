@@ -83,6 +83,9 @@ class WingRollController(Node):
         if self.pid_active and not was_active:
             # Reset recovery ramp when PID control is re-enabled
             self.recovery_factor = 0.0
+            self.integral_error_roll = 0.0
+            self.previous_error_roll = 0.0
+            self.previous_correction_roll = 0.0
 
     def update_pid(self):
         if not self.pid_active:
