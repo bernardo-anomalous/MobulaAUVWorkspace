@@ -84,8 +84,13 @@ class DepthSensorNode(Node):
             pressure_mbar = self.sensor.pressure(ms5837.UNITS_mbar)
 
             # Raw depth calculations
-            depth_water = (pressure_mbar - self.surface_pressure) / (1025 * 9.80665)
-            depth_air = (self.air_reference_pressure - pressure_mbar) / (1.225 * 9.80665)
+            # Convert mbar -> Pa by multiplying by 100 before dividing by rho*g
+            depth_water = (
+                (pressure_mbar - self.surface_pressure) * 100
+            ) / (1025 * 9.80665)
+            depth_air = (
+                (self.air_reference_pressure - pressure_mbar) * 100
+            ) / (1.225 * 9.80665)
 
             # Add to buffers
             self.water_buffer.append(depth_water)
