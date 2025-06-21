@@ -119,12 +119,14 @@ class ServoInterpolationNodeV3(Node):
         return steps
 
     def apply_easing_factors(self, t, easing_in_factor, easing_out_factor):
-        if t < easing_in_factor:
-            return t / easing_in_factor if easing_in_factor > 0 else t
-        elif t > 1 - easing_out_factor:
-            return 1 - (1 - t) / easing_out_factor if easing_out_factor > 0 else t
-        else:
-            return t
+        """Smoothly ease progress near the start and end of a segment."""
+        if easing_in_factor > 0 and t < easing_in_factor:
+            scaled = t / easing_in_factor
+            return scaled * scaled * easing_in_factor
+        if easing_out_factor > 0 and t > 1 - easing_out_factor:
+            scaled = (1 - t) / easing_out_factor
+            return 1 - scaled * scaled * easing_out_factor
+        return t
 
     def cubic_ease_in_out(self, t):
         return 4 * t**3 if t < 0.5 else 1 - ((-2 * t + 2) ** 3) / 2
