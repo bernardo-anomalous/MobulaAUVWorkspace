@@ -43,6 +43,7 @@ class ServoInterpolationNodeV3(Node):
         self.current_angles = np.zeros(6)
         self.movement_type = ''
         self.initial_angles_set = False
+        self.last_command_servo_numbers = list(range(6))
 
     def current_angles_callback(self, msg):
         # Resize the internal array to match the incoming data so we can
@@ -59,6 +60,7 @@ class ServoInterpolationNodeV3(Node):
             return
 
         servo_numbers = msg.servo_numbers
+        self.last_command_servo_numbers = servo_numbers
         target_angles = msg.target_angles
         durations = msg.durations
         easing_algorithms = msg.easing_algorithms
@@ -177,7 +179,13 @@ class ServoInterpolationNodeV3(Node):
         command = ServoMovementCommand()
         command.header.stamp = self.get_clock().now().to_msg()
         command.servo_numbers = list(range(len(self.current_angles)))
-        command.target_angles = self.current_angles.tolist()
+        angles = []
+        for idx in command.servo_numbers:
+            if idx in self.last_command_servo_numbers:
+                angles.append(float(self.current_angles[idx]))
+            else:
+                angles.append(float('nan'))
+        command.target_angles = angles
         command.durations = [0.1] * len(self.current_angles)
         command.easing_algorithms = ['linear'] * len(self.current_angles)
         command.easing_in_factors = [0.0] * len(self.current_angles)

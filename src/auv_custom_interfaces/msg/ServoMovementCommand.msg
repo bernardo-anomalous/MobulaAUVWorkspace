@@ -1,6 +1,6 @@
 std_msgs/Header header              # Standard ROS message header, includes timestamp and frame_id
 uint8[] servo_numbers                  # Servo number (e.g., 0 for left main, 1 for right pitch, etc.)
-float32[] target_angles                # Target angle for the servo
+float32[] target_angles                # Target angle for the servo. Use NaN to keep the previous position
 float32[] durations                    # Duration to reach target angle in seconds
 string[] easing_algorithms             # Easing algorithm to use (e.g., 'linear', 'cubic')
 float32[] easing_in_factors            # Easing-in factor (if applicable)

@@ -71,6 +71,7 @@ High level cmds -> many tiny steps -> servo_driver
 ```
 
 This node breaks large movements into small angles at ~70 Hz. It subscribes to `servo_interpolation_commands` and sends the smooth sequence to `servo_driver_commands`.
+When a sequence ends it sends `NaN` for servos that were untouched, so the driver leaves them as-is.
 
 ### `servo_driver` – talk to the hardware
 
@@ -79,6 +80,7 @@ Commands -> PCA9685 board -> servos move
 ```
 
 As a lifecycle node it writes the final angles to each servo and reports state on topics like `current_servo_angles` and `servo_driver/heartbeat`.
+If an angle in a command is `NaN`, that servo keeps its previous position.
 
 ### `imu_node` – orientation sensing
 
