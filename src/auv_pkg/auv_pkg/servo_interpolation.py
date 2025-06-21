@@ -39,15 +39,17 @@ class ServoInterpolationNodeV3(Node):
         self.timer = None
         self.steps = []
         self.current_step_index = 0
-        self.current_angles = np.zeros(4)  # Assuming 4 servos
+        # Track all known servo angles; the driver supports six servos
+        self.current_angles = np.zeros(6)
         self.movement_type = ''
         self.initial_angles_set = False
 
     def current_angles_callback(self, msg):
-        if len(msg.data) >= len(self.current_angles):
-            self.current_angles = np.array(msg.data[:len(self.current_angles)])
-            self.initial_angles_set = True
-            # self.get_logger().info(f'Received current servo angles: {self.current_angles}')  # Commented out for optimization
+        # Resize the internal array to match the incoming data so we can
+        # accommodate all available servos.
+        self.current_angles = np.array(msg.data)
+        self.initial_angles_set = True
+        # self.get_logger().info(f'Received current servo angles: {self.current_angles}')  # Commented out for optimization
 
     def command_callback(self, msg):
         # self.get_logger().info(f'Received command: servo_numbers={msg.servo_numbers}, target_angles={msg.target_angles}, durations={msg.durations}, movement_type={msg.movement_type}, operational_mode={msg.operational_mode}')  # Commented out for optimization
@@ -72,44 +74,46 @@ class ServoInterpolationNodeV3(Node):
             easing_out_factor = easing_out_factors[i] if i < len(easing_out_factors) else 0.0
 
             num_steps = max(int(duration * self.update_rate_hz), 2)
-            steps = self.calculate_interpolation(start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor)
+            steps = self.calculate_interpolation(start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor, servo_numbers)
 
             cross_fade_steps = min(int(self.cross_fade_factor * num_steps), len(steps), len(self.steps))
             if len(self.steps) > 0 and cross_fade_steps > 0:
                 for j in range(cross_fade_steps):
                     blend_factor = (j + 1) / cross_fade_steps
-                    self.steps[-cross_fade_steps + j]['angles'] = (
-                        (1 - blend_factor) * np.array(self.steps[-cross_fade_steps + j]['angles']) +
-                        blend_factor * steps[j]['angles']
-                    )
+                    if self.steps[-cross_fade_steps + j]['servo_numbers'] == servo_numbers:
+                        self.steps[-cross_fade_steps + j]['angles'] = (
+                            (1 - blend_factor) * np.array(self.steps[-cross_fade_steps + j]['angles']) +
+                            blend_factor * steps[j]['angles']
+                        )
 
             self.steps.extend(steps[cross_fade_steps:])
             start_angles = end_angles
 
         if self.movement_type == 'thrust_unit':
-            self.handle_thrust_unit_movement(start_angles, durations)
+            self.handle_thrust_unit_movement(start_angles, durations, servo_numbers)
 
         if self.timer is None:
             self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
 
-    def handle_thrust_unit_movement(self, start_angles, durations):
+    def handle_thrust_unit_movement(self, start_angles, durations, servo_numbers):
         neutral_angles = np.array([90.0 if idx % 2 == 1 else start_angles[idx] for idx in range(len(start_angles))])
         neutral_duration = durations[-1]
         num_steps = max(int(neutral_duration * self.update_rate_hz), 2)
-        steps = self.calculate_interpolation(start_angles, neutral_angles, neutral_duration, num_steps, 'linear', 0.0, 1.0)
+        steps = self.calculate_interpolation(start_angles, neutral_angles, neutral_duration, num_steps, 'linear', 0.0, 1.0, servo_numbers)
 
         cross_fade_steps = len(steps)
         if len(self.steps) > 0 and cross_fade_steps > 0:
             for j in range(cross_fade_steps):
                 blend_factor = (j + 1) / cross_fade_steps
-                self.steps[-cross_fade_steps + j]['angles'] = (
-                    (1 - blend_factor) * np.array(self.steps[-cross_fade_steps + j]['angles']) +
-                    blend_factor * steps[j]['angles']
-                )
+                if self.steps[-cross_fade_steps + j]['servo_numbers'] == servo_numbers:
+                    self.steps[-cross_fade_steps + j]['angles'] = (
+                        (1 - blend_factor) * np.array(self.steps[-cross_fade_steps + j]['angles']) +
+                        blend_factor * steps[j]['angles']
+                    )
 
         self.steps.extend(steps[cross_fade_steps:])
 
-    def calculate_interpolation(self, start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor):
+    def calculate_interpolation(self, start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor, servo_numbers):
         steps = []
         for step in range(num_steps):
             t = step / (num_steps - 1)
@@ -121,7 +125,7 @@ class ServoInterpolationNodeV3(Node):
                 t = self.exponential_ease_out(t)
 
             intermediate_angles = start_angles + (end_angles - start_angles) * t
-            steps.append({'angles': intermediate_angles, 'duration': duration / num_steps})
+            steps.append({'angles': intermediate_angles, 'duration': duration / num_steps, 'servo_numbers': servo_numbers})
 
         return steps
 
@@ -153,7 +157,7 @@ class ServoInterpolationNodeV3(Node):
 
         command = ServoMovementCommand()
         command.header.stamp = self.get_clock().now().to_msg()
-        command.servo_numbers = list(range(len(step['angles'])))
+        command.servo_numbers = list(step.get('servo_numbers', range(len(step['angles']))))
         command.target_angles = step['angles'].tolist()
         command.durations = [step['duration']] * len(step['angles'])
         command.easing_algorithms = ['linear'] * len(step['angles'])
@@ -166,7 +170,8 @@ class ServoInterpolationNodeV3(Node):
 
         self.publisher.publish(command)
         self.current_step_index += 1
-        self.current_angles = step['angles']
+        # Update tracked angles for the addressed servos only
+        self.current_angles[command.servo_numbers] = step['angles']
 
     def publish_end_command(self):
         command = ServoMovementCommand()
