@@ -62,11 +62,12 @@ class DepthSensorNode(Node):
             raise RuntimeError("Sensor read failed")
 
         initial_pressure = self.sensor.pressure(ms5837.UNITS_mbar)
-        reference_sea_level_pressure = initial_pressure + (DENSITY_AIR * GRAVITY * KNOWN_TESTING_ALTITUDE)
+        delta_pressure = (DENSITY_AIR * GRAVITY * KNOWN_TESTING_ALTITUDE) / 100
+        reference_sea_level_pressure = initial_pressure + delta_pressure
 
         self.get_logger().info(
             f"✅ Calculated sea-level reference pressure for air mode: {reference_sea_level_pressure:.2f} mbar "
-            f"(initial reading {initial_pressure:.2f} mbar at {KNOWN_TESTING_ALTITUDE} m altitude)"
+            f"(initial {initial_pressure:.2f} mbar, ΔP {delta_pressure:.2f} mbar at {KNOWN_TESTING_ALTITUDE} m)"
         )
 
         return reference_sea_level_pressure
