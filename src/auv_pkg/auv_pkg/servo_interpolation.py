@@ -91,29 +91,16 @@ class ServoInterpolationNodeV3(Node):
             self.steps.extend(steps[cross_fade_steps:])
             start_angles = end_angles
 
-        if self.movement_type == 'thrust_unit':
-            self.handle_thrust_unit_movement(start_angles, durations, servo_numbers)
+
+        # The previous implementation performed an additional blending step for
+        # movements tagged as "thrust_unit". It gradually returned servos in odd
+        # positions to the neutral 90° angle. This behaviour produced unwanted
+        # jumps at the end of canned messages so it has been removed. Servos now
+        # maintain the final target angles provided in the command.
 
         if self.timer is None:
             self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
 
-    def handle_thrust_unit_movement(self, start_angles, durations, servo_numbers):
-        neutral_angles = np.array([90.0 if idx % 2 == 1 else start_angles[idx] for idx in range(len(start_angles))])
-        neutral_duration = durations[-1]
-        num_steps = max(int(neutral_duration * self.update_rate_hz), 2)
-        steps = self.calculate_interpolation(start_angles, neutral_angles, neutral_duration, num_steps, 'linear', 0.0, 1.0, servo_numbers)
-
-        cross_fade_steps = len(steps)
-        if len(self.steps) > 0 and cross_fade_steps > 0:
-            for j in range(cross_fade_steps):
-                blend_factor = (j + 1) / cross_fade_steps
-                if self.steps[-cross_fade_steps + j]['servo_numbers'] == servo_numbers:
-                    self.steps[-cross_fade_steps + j]['angles'] = (
-                        (1 - blend_factor) * np.array(self.steps[-cross_fade_steps + j]['angles']) +
-                        blend_factor * steps[j]['angles']
-                    )
-
-        self.steps.extend(steps[cross_fade_steps:])
 
     def calculate_interpolation(self, start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor, servo_numbers):
         steps = []
