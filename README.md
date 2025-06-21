@@ -174,7 +174,7 @@ Many scripts expose constants or parameters that change the AUV response:
 * **Servo ranges** – update `servo_limits` in `pitch_pid.py` or the default `glide_position` parameter of `servo_driver.py`.
 * **Interpolation rate** – tune `update_rate_hz` and `interpolation_density` for the `servo_interpolation` node.
 * **I2C write frequency** – `servo_driver` writes to the PCA9685 board at `update_rate_hz` (30 Hz by default) but only sends updates when the change exceeds `angle_tolerance_deg`.
-* **Depth deadband** – modify `deadband_threshold` in `depth_node.py` to change how small pressure variations are ignored.
+* **Depth deadband** – default is ±5 cm. Modify `deadband_threshold` in `depth_node.py` to change how small pressure variations are ignored.
 
 Parameter files or launch arguments can override these values to suit specific hardware.
 

@@ -32,7 +32,7 @@ class DepthSensorNode(Node):
         self.air_buffer = deque(maxlen=5)
 
         # Deadband setting (meters)
-        self.deadband_threshold = 0.005  # ±5 cm
+        self.deadband_threshold = 0.05  # ±5 cm
 
         # Timer for 2 Hz publishing
         self.timer = self.create_timer(0.5, self.publish_depth)
