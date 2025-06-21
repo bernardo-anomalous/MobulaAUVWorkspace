@@ -179,13 +179,9 @@ class ServoInterpolationNodeV3(Node):
         command = ServoMovementCommand()
         command.header.stamp = self.get_clock().now().to_msg()
         command.servo_numbers = list(range(len(self.current_angles)))
-        angles = []
-        for idx in command.servo_numbers:
-            if idx in self.last_command_servo_numbers:
-                angles.append(float(self.current_angles[idx]))
-            else:
-                angles.append(float('nan'))
-        command.target_angles = angles
+        # Fill the final message with NaN for all servos so the driver keeps the
+        # previous angles but still receives the "end" flag via movement_type.
+        command.target_angles = [float('nan')] * len(self.current_angles)
         command.durations = [0.1] * len(self.current_angles)
         command.easing_algorithms = ['linear'] * len(self.current_angles)
         command.easing_in_factors = [0.0] * len(self.current_angles)

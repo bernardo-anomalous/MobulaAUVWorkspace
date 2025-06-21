@@ -71,7 +71,7 @@ High level cmds -> many tiny steps -> servo_driver
 ```
 
 This node breaks large movements into small angles at ~70 Hz. It subscribes to `servo_interpolation_commands` and sends the smooth sequence to `servo_driver_commands`.
-When a sequence ends it sends `NaN` for servos that were untouched, so the driver leaves them as-is.
+When a sequence ends it sends `NaN` for all servos. The driver leaves every servo at its last angle but still receives the "end" flag to update its status.
 
 ### `servo_driver` – talk to the hardware
 
