@@ -18,7 +18,7 @@ The following sections describe each script, their ROS2 interfaces, and paramete
 ```
 std_msgs/Header header
 uint8[] servo_numbers      # indices of affected servos
-float32[] target_angles    # desired angles in degrees
+float32[] target_angles    # desired angles in degrees; NaN keeps the current position
 float32[] durations        # time to reach each angle
 string[] easing_algorithms # interpolation mode (e.g. 'linear')
 float32[] easing_in_factors
@@ -28,6 +28,7 @@ builtin_interfaces/Time deadline
 string operational_mode
 uint8 priority
 ```
+If a value in `target_angles` is `NaN`, that servo keeps its current position.
 
 Source: `auv_custom_interfaces/msg/ServoMovementCommand.msg` lines 1‑11【F:src/auv_custom_interfaces/msg/ServoMovementCommand.msg†L1-L11】.
 
