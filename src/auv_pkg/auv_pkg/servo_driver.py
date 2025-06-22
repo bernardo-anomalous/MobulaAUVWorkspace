@@ -118,6 +118,40 @@ class ServoDriverNode(LifecycleNode):
                 time.sleep(2)
                 self.restart_process()
 
+    def _stop_timers(self):
+        if self.heartbeat_timer:
+            self.heartbeat_timer.cancel()
+            self.heartbeat_timer = None
+        if self.refresh_timer:
+            self.refresh_timer.cancel()
+            self.refresh_timer = None
+
+    def _stop_pwm(self):
+        if not self.simulation_mode and self.pca:
+            try:
+                for channel in self.pca.channels:
+                    channel.duty_cycle = 0
+                self.get_logger().info(
+                    'PWM signals stopped. Servos should be limp (if supported by model).'
+                )
+            except Exception as e:
+                self.get_logger().error(f'Error while setting duty cycles to 0: {e}')
+
+    def _release_hardware(self):
+        self._stop_pwm()
+        if not self.simulation_mode and self.pca:
+            try:
+                self.pca.deinit()
+            except Exception as e:
+                self.get_logger().error(f'Error deinitializing PCA9685: {e}')
+            self.pca = None
+        if self.i2c:
+            try:
+                self.i2c.deinit()
+            except Exception:
+                pass
+            self.i2c = None
+
     def start_refresh_loop(self):
         update_rate_hz = self.get_parameter('update_rate_hz').value
         self.refresh_timer = self.create_timer(1.0 / update_rate_hz, self.refresh_servo_positions)
@@ -232,7 +266,6 @@ class ServoDriverNode(LifecycleNode):
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Activating Servo Driver Node...')
         self.heartbeat_timer = self.create_timer(1.0, self._publish_heartbeat)  # 1 Hz heartbeat
-
         self.start_refresh_loop()
         self._publish_busy_status("activated")
         self.last_lifecycle_state = 'active'
@@ -241,36 +274,25 @@ class ServoDriverNode(LifecycleNode):
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Deactivating Servo Driver Node... Attempting to limp servos.')
-        if self.heartbeat_timer:
-            self.heartbeat_timer.cancel()
-            self.heartbeat_timer = None
-        if self.refresh_timer:
-            self.refresh_timer.cancel()
-            self.refresh_timer = None
-
-        if not self.simulation_mode and self.pca:
-            try:
-                for channel in self.pca.channels:
-                    channel.duty_cycle = 0
-                self.get_logger().info('PWM signals stopped. Servos should be limp (if supported by model).')
-            except Exception as e:
-                self.get_logger().error(f'Error while setting duty cycles to 0: {e}')
+        self._stop_timers()
+        self._stop_pwm()
         self.last_lifecycle_state = 'inactive'
         self._publish_lifecycle_state()
         return TransitionCallbackReturn.SUCCESS
 
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Cleaning up Servo Driver Node...')
-        if not self.simulation_mode and self.pca:
-            self.pca.deinit()
-            self.pca = None
-        if self.i2c:
-            try:
-                self.i2c.deinit()
-            except Exception:
-                pass
-            self.i2c = None
+        self._stop_timers()
+        self._release_hardware()
         self.last_lifecycle_state = 'unconfigured'
+        self._publish_lifecycle_state()
+        return TransitionCallbackReturn.SUCCESS
+
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
+        self.get_logger().info('Shutting down Servo Driver Node...')
+        self._stop_timers()
+        self._release_hardware()
+        self.last_lifecycle_state = 'shutdown'
         self._publish_lifecycle_state()
         return TransitionCallbackReturn.SUCCESS
 
@@ -340,6 +362,7 @@ def main(args=None):
     except KeyboardInterrupt:
         node.get_logger().info('Keyboard interrupt, shutting down.')
     finally:
+        node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
 
