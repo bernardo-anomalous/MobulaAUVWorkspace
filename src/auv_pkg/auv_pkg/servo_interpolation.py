@@ -44,6 +44,9 @@ class ServoInterpolationNodeV3(Node):
         self.movement_type = ''
         self.initial_angles_set = False
         self.last_command_servo_numbers = list(range(6))
+        self.operational_mode = 'energy_efficient'
+        self.priority = 0
+        self.deadline = rclpy.time.Time()
 
     def current_angles_callback(self, msg):
         # Resize the internal array to match the incoming data so we can
@@ -59,6 +62,13 @@ class ServoInterpolationNodeV3(Node):
             # self.get_logger().warn('Current servo angles not yet received. Ignoring command.')  # Commented out for optimization
             return
 
+        # Cancel any in-progress interpolation so new instructions take effect
+        if self.timer is not None:
+            self.timer.cancel()
+            self.timer = None
+        self.steps = []
+        self.current_step_index = 0
+
         servo_numbers = msg.servo_numbers
         self.last_command_servo_numbers = servo_numbers
         target_angles = msg.target_angles
@@ -67,6 +77,9 @@ class ServoInterpolationNodeV3(Node):
         easing_in_factors = msg.easing_in_factors
         easing_out_factors = msg.easing_out_factors
         self.movement_type = msg.movement_type
+        self.operational_mode = msg.operational_mode or 'energy_efficient'
+        self.priority = msg.priority
+        self.deadline = msg.deadline
 
         start_angles = self.current_angles[servo_numbers]
         for i, duration in enumerate(durations):
@@ -155,9 +168,9 @@ class ServoInterpolationNodeV3(Node):
         command.easing_in_factors = [0.0] * len(step['angles'])
         command.easing_out_factors = [0.0] * len(step['angles'])
         command.movement_type = self.movement_type
-        command.deadline = (self.get_clock().now() + rclpy.duration.Duration(seconds=10)).to_msg()
-        command.operational_mode = 'energy_efficient'
-        command.priority = 0
+        command.deadline = self.deadline
+        command.operational_mode = self.operational_mode
+        command.priority = self.priority
 
         self.publisher.publish(command)
         self.current_step_index += 1
@@ -176,9 +189,9 @@ class ServoInterpolationNodeV3(Node):
         command.easing_in_factors = [0.0] * len(self.current_angles)
         command.easing_out_factors = [0.0] * len(self.current_angles)
         command.movement_type = f'{self.movement_type} + end'
-        command.deadline = (self.get_clock().now() + rclpy.duration.Duration(seconds=10)).to_msg()
-        command.operational_mode = 'energy_efficient'
-        command.priority = 0
+        command.deadline = self.deadline
+        command.operational_mode = self.operational_mode
+        command.priority = self.priority
 
         self.publisher.publish(command)
 

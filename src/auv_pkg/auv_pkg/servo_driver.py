@@ -45,6 +45,7 @@ class ServoDriverNode(LifecycleNode):
         self.busy_status_publisher = self.create_publisher(String, 'servo_driver_status', 10)
         self.last_published_status = None
         self.executing_movement = False
+        self.current_movement_type = ''
         self._publish_busy_status("starting up")
 
         # Lifecycle state tracking
@@ -305,11 +306,12 @@ class ServoDriverNode(LifecycleNode):
 
             if 'end' in movement_type:
                 self.executing_movement = False
+                self.current_movement_type = ''
                 self._publish_busy_status("nominal: roll and pitch pid engaged")
             elif movement_type != 'pid_control':
-                if not self.executing_movement:
-                    self.executing_movement = True
-                    self._publish_busy_status(f"busy: executing {msg.movement_type}")
+                self.executing_movement = True
+                self.current_movement_type = movement_type
+                self._publish_busy_status(f"busy: executing {msg.movement_type}")
             else:
                 if not self.executing_movement:
                     self._publish_busy_status("nominal: roll and pitch pid engaged")
