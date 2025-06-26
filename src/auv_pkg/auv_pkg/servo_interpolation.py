@@ -15,7 +15,7 @@ class ServoInterpolationNodeV3(Node):
         self.declare_parameter('interpolation_density', 10)
         self.declare_parameter('update_rate_hz', 70)
         self.declare_parameter('cross_fade_factor', 0.5)
-        self.declare_parameter('interrupt_transition_duration', 0.2)
+        self.declare_parameter('interrupt_transition_duration', 0.8)
         self.declare_parameter('interrupt_transition_easing', 'cubic')
 
         self.interpolation_density = self.get_parameter('interpolation_density').value
