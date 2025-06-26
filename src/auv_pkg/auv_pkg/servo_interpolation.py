@@ -15,10 +15,14 @@ class ServoInterpolationNodeV3(Node):
         self.declare_parameter('interpolation_density', 10)
         self.declare_parameter('update_rate_hz', 70)
         self.declare_parameter('cross_fade_factor', 0.5)
+        self.declare_parameter('interrupt_transition_duration', 0.2)
+        self.declare_parameter('interrupt_transition_easing', 'cubic')
 
         self.interpolation_density = self.get_parameter('interpolation_density').value
         self.update_rate_hz = self.get_parameter('update_rate_hz').value
         self.cross_fade_factor = self.get_parameter('cross_fade_factor').value
+        self.interrupt_transition_duration = self.get_parameter('interrupt_transition_duration').value
+        self.interrupt_transition_easing = self.get_parameter('interrupt_transition_easing').value
 
         # === Publishers and Subscribers ===
         self.publisher = self.create_publisher(ServoMovementCommand, 'servo_driver_commands', 10)
@@ -82,14 +86,32 @@ class ServoInterpolationNodeV3(Node):
         self.deadline = msg.deadline
 
         start_angles = self.current_angles[servo_numbers]
-        for i, duration in enumerate(durations):
+        start_index = 0
+        if self.interrupt_transition_duration > 0 and len(target_angles) >= len(servo_numbers):
+            first_target = np.array(target_angles[:len(servo_numbers)])
+            num_steps = max(int(self.interrupt_transition_duration * self.update_rate_hz), 2)
+            transition_steps = self.calculate_interpolation(
+                start_angles,
+                first_target,
+                self.interrupt_transition_duration,
+                num_steps,
+                self.interrupt_transition_easing,
+                0.0,
+                0.0,
+                servo_numbers
+            )
+            self.steps.extend(transition_steps)
+            start_angles = first_target
+            start_index = 1
+
+        for i in range(start_index, len(durations)):
             end_angles = np.array(target_angles[i * len(servo_numbers):(i + 1) * len(servo_numbers)])
             easing_algorithm = easing_algorithms[i] if i < len(easing_algorithms) else 'linear'
             easing_in_factor = easing_in_factors[i] if i < len(easing_in_factors) else 0.0
             easing_out_factor = easing_out_factors[i] if i < len(easing_out_factors) else 0.0
 
-            num_steps = max(int(duration * self.update_rate_hz), 2)
-            steps = self.calculate_interpolation(start_angles, end_angles, duration, num_steps, easing_algorithm, easing_in_factor, easing_out_factor, servo_numbers)
+            num_steps = max(int(durations[i] * self.update_rate_hz), 2)
+            steps = self.calculate_interpolation(start_angles, end_angles, durations[i], num_steps, easing_algorithm, easing_in_factor, easing_out_factor, servo_numbers)
 
             cross_fade_steps = min(int(self.cross_fade_factor * num_steps), len(steps), len(self.steps))
             if len(self.steps) > 0 and cross_fade_steps > 0:
