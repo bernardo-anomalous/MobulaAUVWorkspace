@@ -117,6 +117,7 @@ Lifecycle node controlling the PCA9685 servo board.
 ### `servo_interpolation.py`
 Interpolates complex movements into small servo steps.
 * Parameters `interpolation_density`, `update_rate_hz`, and `cross_fade_factor` control resolution and blending【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L15-L21】.
+* Parameters `interrupt_transition_duration` and `interrupt_transition_easing` tune the blend from current angles to the first step of a new command【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L15-L25】.
 * Generates servo commands at `update_rate_hz` (70 Hz by default). This determines how often new angles are sent to `servo_driver`.
 * Subscribes to `servo_interpolation_commands` and publishes resulting `ServoMovementCommand` messages to `servo_driver_commands`【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L24-L32】.
 * Maintains the last known servo angles so movements can cross‑fade smoothly.
