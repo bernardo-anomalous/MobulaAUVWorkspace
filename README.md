@@ -106,6 +106,8 @@ Publishes IMU orientation and health. Important parameters and behaviour:
 * Periodically attempts sensor reinitialization if read failures occur.
 * After repeated failures the node performs a minimal initialization
   (accelerometer only) before restarting.
+* If sensor values remain unchanged for `stagnant_timeout_sec` seconds
+  (default `3.0`), the node restarts itself to recover from bus hangs.
 
 ### `servo_driver.py`
 Lifecycle node controlling the PCA9685 servo board.
