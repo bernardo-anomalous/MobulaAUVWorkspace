@@ -32,6 +32,12 @@ class IMUNode(Node):
         self.last_health_status = None
         self.last_failure_reason = None
 
+        # Repeated data detection
+        self.declare_parameter('stagnant_timeout_sec', 3.0)
+        self.stagnant_timeout_sec = self.get_parameter('stagnant_timeout_sec').value
+        self._last_data = None
+        self._stagnant_start = None
+
         self.timer = self.create_timer(0.1, self.publish_imu_data)  # 10 Hz
         self.retry_timer = self.create_timer(5.0, self._retry_init_if_needed)
 
@@ -228,6 +234,24 @@ class IMUNode(Node):
             quat_i, quat_j, quat_k, quat_real = self.bno.quaternion
             accel_x, accel_y, accel_z = self.bno.acceleration
             gyro_x, gyro_y, gyro_z = self.bno.gyro
+
+            current_tuple = (
+                quat_i, quat_j, quat_k, quat_real,
+                accel_x, accel_y, accel_z,
+                gyro_x, gyro_y, gyro_z,
+            )
+
+            if current_tuple == self._last_data:
+                if self._stagnant_start is None:
+                    self._stagnant_start = time.time()
+                elif time.time() - self._stagnant_start >= self.stagnant_timeout_sec:
+                    self.get_logger().error('IMU data unchanged beyond timeout; restarting')
+                    self.publish_health_status('IMU STAGNANT')
+                    self.restart_process()
+                    return
+            else:
+                self._last_data = current_tuple
+                self._stagnant_start = time.time()
 
             # === Data Validation ===
             if not self.validate_imu_data(quat_i, quat_j, quat_k, quat_real, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z):
