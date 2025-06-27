@@ -29,8 +29,7 @@ setup(
             "keyboard_control_swim = auv_pkg.keyboard_control_swim:main",
             "camera_control = auv_pkg.camera_control:main",
             "depth_sensor = auv_pkg.depth_node:main",
-            "acceleration_node = auv_pkg.acceleration_node:main",
-            "fix_imu = auv_pkg.fix_imu_node:main"
+            "acceleration_node = auv_pkg.acceleration_node:main"
         ],
     },
 )

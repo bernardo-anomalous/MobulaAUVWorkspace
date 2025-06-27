@@ -111,6 +111,16 @@ class IMUNode(Node):
             else:
                 self.get_logger().fatal(
                     f"Restart after {self.reset_attempts} soft reset attempts")
+                if self.initialize_sensor_minimal():
+                    if self.i2c:
+                        try:
+                            self.i2c.deinit()
+                        except Exception as e:
+                            self.get_logger().error(
+                                f"Error shutting down minimal init: {e}")
+                        time.sleep(0.1)
+                    self.initialize_sensor()
+                    return
                 # Request a restart and report health status once
                 self.publish_health_status("IMU RESTARTING")
                 time.sleep(2)
@@ -139,6 +149,31 @@ class IMUNode(Node):
         if self.sensor_ready:
             return
         self.record_failure_and_check_restart()
+
+    def initialize_sensor_minimal(self) -> bool:
+        """Attempt minimal setup enabling only the accelerometer."""
+        self.get_logger().info("Attempting minimal BNO08X initialization...")
+        try:
+            if self.i2c:
+                self.i2c.deinit()
+                time.sleep(0.1)
+
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.bno = BNO08X_I2C(self.i2c, address=0x4B)
+            time.sleep(0.2)
+            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            time.sleep(0.1)
+
+            self.sensor_ready = True
+            self.failure_timestamps.clear()
+            self.publish_health_status("IMU MINIMAL OK")
+            self.get_logger().info("Minimal initialization successful.")
+            return True
+        except Exception as e:
+            self.sensor_ready = False
+            self.last_failure_reason = str(e)
+            self.get_logger().error(f"Minimal init failed: {e}")
+            return False
 
     def initialize_sensor(self):
         self.get_logger().info("Initializing BNO08X sensor...")
