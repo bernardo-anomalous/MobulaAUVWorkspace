@@ -104,6 +104,8 @@ Publishes IMU orientation and health. Important parameters and behaviour:
 * Maintains a `heading_offset` used when translating yaw to compass directions (default `-30.0`)【F:src/auv_pkg/auv_pkg/imu_node.py†L24-L24】.
 * Publishes `Imu` messages on `imu/data`, Euler angles on `imu/euler`, textual heading on `imu/heading`, and status on `imu/health_status`【F:src/auv_pkg/auv_pkg/imu_node.py†L27-L31】.
 * Periodically attempts sensor reinitialization if read failures occur.
+* After repeated failures the node performs a minimal initialization
+  (accelerometer only) before restarting.
 
 ### `servo_driver.py`
 Lifecycle node controlling the PCA9685 servo board.
@@ -166,7 +168,8 @@ Optional node mapping arm/hand poses to servo commands using OpenCV and MediaPip
 ### Utility and Test Scripts
 * `servo_test.py` provides a CLI to exercise servos for calibration; angles are clamped to 0–180°.
 * `pressure_sensor_test.py` reads the pressure sensor outside of ROS.
-* `fix_imu_node.py` and other backups serve as experimental versions of main nodes.
+* `fix_imu_node.py` was an experimental fallback. Its logic is now
+  integrated into `imu_node`.
 
 ## Modifying Behaviour
 
