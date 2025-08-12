@@ -164,7 +164,9 @@ class ServoDriverNode(LifecycleNode):
                 target_angles_copy = self.last_target_angles.copy()
 
             for servo_number, target_angle in enumerate(target_angles_copy):
-                if math.isnan(target_angle):
+                # Skip update if publisher sent None or NaN for this servo.
+                # Future publishers should avoid sending None values.
+                if target_angle is None or math.isnan(target_angle):
                     continue
                 if servo_number in self.servos:
                     last_angle = (
@@ -320,8 +322,12 @@ class ServoDriverNode(LifecycleNode):
             with self.target_lock:
                 for i, servo_number in enumerate(msg.servo_numbers):
                     if 0 <= servo_number < len(self.last_target_angles):
-                        if not math.isnan(msg.target_angles[i]):
-                            self.last_target_angles[servo_number] = msg.target_angles[i]
+                        target_angle = msg.target_angles[i]
+                        # Ignore None or NaN target angles; publishers should
+                        # provide explicit values for commanded servos.
+                        if target_angle is None or math.isnan(target_angle):
+                            continue
+                        self.last_target_angles[servo_number] = target_angle
 
 
             self._publish_current_servo_angles()
