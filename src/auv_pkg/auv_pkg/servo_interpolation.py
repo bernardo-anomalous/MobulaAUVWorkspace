@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 from auv_custom_interfaces.msg import ServoMovementCommand
 from rclpy.timer import Timer
 import numpy as np
@@ -17,12 +17,18 @@ class ServoInterpolationNodeV3(Node):
         self.declare_parameter('cross_fade_factor', 0.5)
         self.declare_parameter('interrupt_transition_duration', 0.8)
         self.declare_parameter('interrupt_transition_easing', 'cubic')
+        self.declare_parameter('imu_fault_timeout_sec', 2.0)
+        self.declare_parameter('imu_recovery_delay_sec', 1.0)
+        self.declare_parameter('glide_position', [90.0] * 6)
 
         self.interpolation_density = self.get_parameter('interpolation_density').value
         self.update_rate_hz = self.get_parameter('update_rate_hz').value
         self.cross_fade_factor = self.get_parameter('cross_fade_factor').value
         self.interrupt_transition_duration = self.get_parameter('interrupt_transition_duration').value
         self.interrupt_transition_easing = self.get_parameter('interrupt_transition_easing').value
+        self.imu_fault_timeout_sec = self.get_parameter('imu_fault_timeout_sec').value
+        self.imu_recovery_delay_sec = self.get_parameter('imu_recovery_delay_sec').value
+        self.glide_position = np.array(self.get_parameter('glide_position').value, dtype=float)
 
         # === Publishers and Subscribers ===
         self.publisher = self.create_publisher(ServoMovementCommand, 'servo_driver_commands', 10)
@@ -39,6 +45,12 @@ class ServoInterpolationNodeV3(Node):
             self.current_angles_callback,
             10)
 
+        self.imu_status_subscriber = self.create_subscription(
+            String,
+            'imu/health_status',
+            self.imu_status_callback,
+            10)
+
         # === Timer and State ===
         self.timer = None
         self.steps = []
@@ -51,6 +63,10 @@ class ServoInterpolationNodeV3(Node):
         self.operational_mode = 'energy_efficient'
         self.priority = 0
         self.deadline = rclpy.time.Time()
+        self.last_ok_time = self.get_clock().now().nanoseconds / 1e9
+        self.fault_active = False
+        self.current_imu_status = 'OK'
+        self.health_timer = self.create_timer(0.1, self.health_monitor_callback)
 
     def current_angles_callback(self, msg):
         # Resize the internal array to match the incoming data so we can
@@ -59,8 +75,18 @@ class ServoInterpolationNodeV3(Node):
         self.initial_angles_set = True
         # self.get_logger().info(f'Received current servo angles: {self.current_angles}')  # Commented out for optimization
 
+    def imu_status_callback(self, msg):
+        now = self.get_clock().now().nanoseconds / 1e9
+        status = msg.data
+        if status == 'OK':
+            self.last_ok_time = now
+        self.current_imu_status = status
+
     def command_callback(self, msg):
         # self.get_logger().info(f'Received command: servo_numbers={msg.servo_numbers}, target_angles={msg.target_angles}, durations={msg.durations}, movement_type={msg.movement_type}, operational_mode={msg.operational_mode}')  # Commented out for optimization
+
+        if self.fault_active:
+            return
 
         if not self.initial_angles_set:
             # self.get_logger().warn('Current servo angles not yet received. Ignoring command.')  # Commented out for optimization
@@ -198,6 +224,33 @@ class ServoInterpolationNodeV3(Node):
         self.current_step_index += 1
         # Update tracked angles for the addressed servos only
         self.current_angles[command.servo_numbers] = step['angles']
+
+    def health_monitor_callback(self):
+        now = self.get_clock().now().nanoseconds / 1e9
+        if self.current_imu_status != 'OK':
+            if not self.fault_active and now - self.last_ok_time > self.imu_fault_timeout_sec:
+                self.fault_active = True
+                if self.timer is not None:
+                    self.timer.cancel()
+                servo_numbers = list(range(len(self.glide_position)))
+                start_angles = self.current_angles[servo_numbers] if self.initial_angles_set else np.zeros(len(self.glide_position))
+                num_steps = max(int(self.update_rate_hz), 2)
+                self.steps = self.calculate_interpolation(
+                    start_angles,
+                    self.glide_position,
+                    1.0,
+                    num_steps,
+                    'linear',
+                    0.0,
+                    0.0,
+                    servo_numbers
+                )
+                self.movement_type = 'glide'
+                self.current_step_index = 0
+                self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
+        else:
+            if self.fault_active and now - self.last_ok_time > self.imu_recovery_delay_sec:
+                self.fault_active = False
 
     def publish_end_command(self):
         command = ServoMovementCommand()
