@@ -1,23 +1,18 @@
-# Create an updated, more verbose installer script so the user can see progress.
-from pathlib import Path
-script = r"""#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Resumable MediaMTX setup (Ubuntu on Raspberry Pi) — VERBOSE EDITION
-# - Shows progress for every action
-# - Prints commands before running them
-# - Still idempotent + resumable per step
 set -uo pipefail
 
-### ===== CLI =====
-FORCE_STEP="${1:-}"   # e.g. --force step=config
+# ===== CLI =====
+FORCE_STEP="${1:-}"   # usage: --force [all|packages|install_bin|config|unit|enable_start]
 if [[ "${FORCE_STEP}" == "--force" ]]; then
   FORCE_STEP="${2:-all}"; shift 2 || true
 else
   FORCE_STEP=""
 fi
 
-### ===== Vars =====
-MEDIAMTX_URL_DEFAULT="https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64v8.tar.gz"
-MEDIAMTX_URL="${MEDIAMTX_URL:-$MEDIAMTX_URL_DEFAULT}"
+# ===== Vars =====
+# If you leave MEDIAMTX_URL empty, we'll resolve the latest arm64v8 asset from GitHub API.
+MEDIAMTX_URL="${MEDIAMTX_URL:-}"
 
 FRAMERATE="${FRAMERATE:-15}"
 RESOLUTION="${RESOLUTION:-1280x720}"
@@ -44,20 +39,14 @@ $SUDO touch "${STATE_FILE}" 2>/dev/null || true
 
 ts() { date +"%Y-%m-%d %H:%M:%S"; }
 log()  { echo -e "$(ts) ${LOG_PREFIX} $*"; }
-ok()   { echo -e "$(ts) ${LOG_PREFIX} ✅ $*"; }
-warn() { echo -e "$(ts) ${LOG_PREFIX} ⚠️ $*" >&2; }
-err()  { echo -e "$(ts) ${LOG_PREFIX} ❌ $*" >&2; FAILS=$((FAILS+1)); }
+ok()   { echo -e "$(ts) ${LOG_PREFIX} OK  $*"; }
+warn() { echo -e "$(ts) ${LOG_PREFIX} WARN $*" >&2; }
+err()  { echo -e "$(ts) ${LOG_PREFIX} ERR $*" >&2; FAILS=$((FAILS+1)); }
 
-show_cmd() { printf "%s %s\n" "$(ts) ${LOG_PREFIX} ➤" "$*"; }
-run() {
-  show_cmd "$*"
-  bash -c "$@"
-}
+show_cmd() { printf "%s %s %s\n" "$(ts)" "${LOG_PREFIX}" "➤ $*"; }
+run() { show_cmd "$*"; bash -c "$@"; }
 
-is_done() {
-  local step="$1"
-  grep -q "^${step}\$" "${STATE_FILE}" 2>/dev/null
-}
+is_done() { grep -q "^$1\$" "${STATE_FILE}" 2>/dev/null; }
 mark_done() { echo "$1" | $SUDO tee -a "${STATE_FILE}" >/dev/null; }
 maybe_force() {
   local step="$1"
@@ -70,11 +59,10 @@ maybe_force() {
 
 step() { echo; log "=== $1 ==="; }
 
-### STEP: packages
+# ----- STEP: packages -----
 do_packages() {
   step "packages"
   if is_done packages && ! maybe_force packages; then ok "packages already done"; return; fi
-  # Show apt progress/output explicitly
   export DEBIAN_FRONTEND=noninteractive
   if run "$SUDO apt-get update"; then
     if run "$SUDO apt-get install -y ffmpeg v4l-utils curl tar udev"; then
@@ -88,18 +76,73 @@ do_packages() {
   fi
 }
 
-### STEP: install mediamtx
+# ----- Resolve latest arm64 URL from GitHub API (with fallback) -----
+resolve_latest_arm64_url() {
+  # Try GitHub API for the exact asset URL
+  local api="https://api.github.com/repos/bluenviron/mediamtx/releases/latest"
+  local url
+  url="$(curl -fsSL "$api" \
+    | grep -oE 'https://github.com/bluenviron/mediamtx/releases/download/[^"]+/mediamtx[^"]*linux_arm64v8\.tar\.gz' \
+    | head -n1 || true)"
+  if [[ -n "$url" ]]; then
+    echo "$url"
+    return 0
+  fi
+  # Fallback to a tag name (latest tag)
+  local tag
+  tag="$(curl -fsSL https://api.github.com/repos/bluenviron/mediamtx/tags \
+    | grep -m1 -oE '"name":\s*"v[0-9]+\.[0-9]+\.[0-9]+"' \
+    | head -n1 | sed 's/.*"v/v/;s/"$//' || true)"
+  if [[ -n "$tag" ]]; then
+    echo "https://github.com/bluenviron/mediamtx/releases/download/${tag}/mediamtx_${tag}_linux_arm64v8.tar.gz"
+    return 0
+  fi
+  # Last resort: the "latest/download" pattern (may redirect to HTML sometimes)
+  echo "https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64v8.tar.gz"
+}
+
+# ----- STEP: install mediamtx -----
 do_install_bin() {
   step "install_bin"
+  # Always stop any running instance first (prevents port binds and in-use binary)
+  if systemctl list-unit-files | grep -q '^mediamtx\.service'; then
+    run "$SUDO systemctl stop mediamtx || true"
+  fi
+  # Kill stray processes if any
+  if pgrep -x mediamtx >/dev/null 2>&1; then
+    warn "Killing stray mediamtx process"
+    run "$SUDO pkill -x mediamtx || true"
+    sleep 1
+  fi
+
   if is_done install_bin && [[ -x "${MTX_BIN}" ]] && ! maybe_force install_bin; then
     ok "binary already installed at ${MTX_BIN}"
     return
   fi
+
+  # Pick URL (use env override if provided; otherwise resolve latest)
+  local url
+  if [[ -n "${MEDIAMTX_URL}" ]]; then
+    url="${MEDIAMTX_URL}"
+    log "Using MEDIAMTX_URL from env: ${url}"
+  else
+    url="$(resolve_latest_arm64_url)"
+    log "Resolved latest asset URL: ${url}"
+  fi
+
+  local TMP
   TMP=$(mktemp -d) || { err "mktemp failed"; return; }
   show_cmd "cd \"$TMP\""
   cd "$TMP" || { err "cannot cd $TMP"; return; }
-  if run "curl -L -o mediamtx.tar.gz \"${MEDIAMTX_URL}\""; then
-    # Verbose tar so user sees extraction
+
+  # Download
+  if run "curl -L --progress-bar -o mediamtx.tar.gz \"${url}\""; then
+    # Sanity check: is it really a gzip tar?
+    if ! tar -tzf mediamtx.tar.gz >/dev/null 2>&1; then
+      err "downloaded file is not a valid tar.gz (GitHub HTML/redirect or rate-limit?). Try again or set MEDIAMTX_URL explicitly."
+      return
+    fi
+    # Extract verbosely
     if run "tar -xzvf mediamtx.tar.gz"; then
       if [[ -x ./mediamtx ]]; then
         if run "$SUDO install -m 0755 ./mediamtx \"${MTX_BIN}\""; then
@@ -109,7 +152,7 @@ do_install_bin() {
           err "install failed"
         fi
       else
-        err "downloaded archive did not contain an executable 'mediamtx'"
+        err "archive did not contain an executable 'mediamtx'"
       fi
     else
       err "extract failed"
@@ -119,7 +162,7 @@ do_install_bin() {
   fi
 }
 
-### STEP: config
+# ----- STEP: config -----
 detect_cam() {
   local cam="${CAMERA_BYID:-}"
   if [[ -z "${cam}" ]]; then
@@ -132,10 +175,10 @@ detect_cam() {
 write_conf() {
   local cam="$1"
   run "$SUDO install -d -m 755 -o root -g root \"${MTX_ETC_DIR}\"" || return 1
-  # Backup once if unmanaged file exists
   if [[ -f "${MTX_CONF}" ]] && ! grep -q "${STAMP}" "${MTX_CONF}"; then
     run "$SUDO cp -n \"${MTX_CONF}\" \"${MTX_CONF}.bak.$(date +%Y%m%d%H%M%S)\"" || true
   fi
+  local TMP
   TMP=$(mktemp)
   cat > "${TMP}" <<YAML
 ${STAMP}
@@ -143,8 +186,10 @@ webrtc: yes
 webrtcAddress: :${WEBRTC_HTTP_PORT}
 webrtcLocalUDPAddress: :${WEBRTC_UDP_PORT}
 webrtcAllowOrigin: '*'
-webrtcICEServers:
-  - stun:${STUN_SERVER}
+# Note: 'webrtcICEServers' is deprecated; 'webrtcICEServers2' is preferred.
+webrtcICEServers2:
+  - urls:
+      - stun:${STUN_SERVER}
 
 paths:
   ${PATH_NAME}:
@@ -174,8 +219,9 @@ do_config() {
   fi
 }
 
-### STEP: systemd unit
+# ----- STEP: systemd unit -----
 write_unit() {
+  local TMP
   TMP=$(mktemp)
   cat > "${TMP}" <<UNIT
 ${STAMP}
@@ -187,6 +233,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStartPre=/bin/sh -c 'udevadm settle --timeout=8 || true'
+# If UDP 8000/8001 are in use on your system, consider setting rtpPort/rtcpPort in ${MTX_CONF}
 ExecStart=${MTX_BIN} ${MTX_CONF}
 Restart=on-failure
 RestartSec=2
@@ -211,7 +258,7 @@ do_unit() {
   fi
 }
 
-### STEP: enable+start
+# ----- STEP: enable+start -----
 do_enable_start() {
   step "enable_start"
   if is_done enable_start && ! maybe_force enable_start; then
@@ -232,7 +279,7 @@ do_enable_start() {
   fi
 }
 
-### STEP: health
+# ----- STEP: health -----
 do_health() {
   step "health"
   run "$SUDO systemctl --no-pager --full status mediamtx || true"
@@ -249,7 +296,7 @@ do_health() {
   [[ -n "${GET_THR}" ]] && log "get_throttled=${GET_THR} (0 means clean this boot)"
 }
 
-### Run steps
+# Run steps
 do_packages
 do_install_bin
 do_config
@@ -266,13 +313,7 @@ echo "URL:      http://<PI_IP>:${WEBRTC_HTTP_PORT}/${PATH_NAME}/"
 echo "Camera:   $(grep -m1 ' -i ' ${MTX_CONF} 2>/dev/null | sed 's/.*-i //;s/ -vcodec.*//' || echo '?')"
 echo "State:    ${STATE_FILE} (remove or use --force to redo steps)"
 if [[ ${FAILS} -eq 0 ]]; then
-  echo "Result:   ✅ OK"
+  echo "Result:   OK"
 else
-  echo "Result:   ❌ ${FAILS} error(s) (see output above)"
+  echo "Result:   FAIL (${FAILS} error(s))"
 fi
-"""
-out = Path("/mnt/data/setup_mediamtx_pi_verbose.sh")
-out.write_text(script, encoding="utf-8")
-import os
-os.chmod(out, 0o755)
-str(out)
