@@ -88,6 +88,25 @@ class IMUNode(Node):
             poll_period = 0.1
         self.get_logger().info(f"IMU polling period set to {poll_period:.3f}s (~{1.0 / poll_period:.2f} Hz)")
 
+        self.declare_parameter('stagnant_orientation_tolerance', 1e-4)
+        self.declare_parameter('stagnant_accel_tolerance', 5e-3)
+        self.declare_parameter('stagnant_gyro_tolerance', 1e-3)
+        self._stagnant_orientation_tolerance = float(self.get_parameter('stagnant_orientation_tolerance').value)
+        self._stagnant_accel_tolerance = float(self.get_parameter('stagnant_accel_tolerance').value)
+        self._stagnant_gyro_tolerance = float(self.get_parameter('stagnant_gyro_tolerance').value)
+        self._stagnant_tolerances = (
+            self._stagnant_orientation_tolerance,
+            self._stagnant_orientation_tolerance,
+            self._stagnant_orientation_tolerance,
+            self._stagnant_orientation_tolerance,
+            self._stagnant_accel_tolerance,
+            self._stagnant_accel_tolerance,
+            self._stagnant_accel_tolerance,
+            self._stagnant_gyro_tolerance,
+            self._stagnant_gyro_tolerance,
+            self._stagnant_gyro_tolerance,
+        )
+
         # timers
         self.timer = self.create_timer(poll_period, self.publish_imu_data)
         self.retry_timer = self.create_timer(5.0, self._retry_init_if_needed)
@@ -415,17 +434,21 @@ class IMUNode(Node):
 
             current_tuple = (qi, qj, qk, qr, ax, ay, az, gx, gy, gz)
 
-            if current_tuple == self._last_data:
-                if self._stagnant_start is None:
-                    self._stagnant_start = time.time()
-                elif time.time() - self._stagnant_start >= self.stagnant_timeout_sec:
-                    self.get_logger().error('IMU data unchanged beyond timeout; restarting')
-                    self.publish_health_status('IMU STAGNANT', force=True)
-                    self.restart_process()
-                    return
-            else:
+            if self._last_data is None:
                 self._last_data = current_tuple
-                self._stagnant_start = time.time()
+                self._stagnant_start = None
+            else:
+                if self._within_stagnant_tolerance(current_tuple):
+                    if self._stagnant_start is None:
+                        self._stagnant_start = time.time()
+                    elif time.time() - self._stagnant_start >= self.stagnant_timeout_sec:
+                        self.get_logger().error('IMU data unchanged beyond timeout; restarting')
+                        self.publish_health_status('IMU STAGNANT', force=True)
+                        self.restart_process()
+                        return
+                else:
+                    self._stagnant_start = None
+                self._last_data = current_tuple
 
             # validation with small streak to avoid flapping
             if not self.validate_imu_data(qi, qj, qk, qr, ax, ay, az, gx, gy, gz):
@@ -503,6 +526,14 @@ class IMUNode(Node):
         gyro_threshold = math.radians(2000)  # ~35 rad/s
         if any(abs(g) > gyro_threshold for g in (gx, gy, gz)):
             return False
+        return True
+
+    def _within_stagnant_tolerance(self, current_tuple):
+        if self._last_data is None:
+            return False
+        for value, last_value, tolerance in zip(current_tuple, self._last_data, self._stagnant_tolerances):
+            if abs(value - last_value) > tolerance:
+                return False
         return True
 
 
