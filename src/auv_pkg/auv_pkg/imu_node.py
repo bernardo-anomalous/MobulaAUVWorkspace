@@ -282,6 +282,7 @@ class IMUNode(Node):
 
             self.get_logger().error("Soft reset successful.")
             self.publish_health_status("IMU OK", force=True)   # <== ensure OK after successful reset
+            self.reset_attempts = 0
             return True
         except Exception as e:
             self.get_logger().error(f"Soft reset failed: {e}")
@@ -349,6 +350,7 @@ class IMUNode(Node):
             self.last_failure_reason = None
             self.publish_health_status("IMU MINIMAL OK", force=True)
             self.get_logger().info("Minimal initialization successful.")
+            self.reset_attempts = 0
             return True
         except Exception as e:
             self.sensor_ready = False
@@ -390,6 +392,7 @@ class IMUNode(Node):
             self.last_failure_reason = None
             self.publish_health_status("IMU OK", force=True)
             self.get_logger().info("Sensor initialized and ready.")
+            self.reset_attempts = 0
         except Exception as e:
             self.sensor_ready = False
             self.last_failure_reason = str(e)
