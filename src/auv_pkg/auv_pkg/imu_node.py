@@ -38,7 +38,20 @@ class IMUNode(Node):
         self._last_data = None
         self._stagnant_start = None
 
-        self.timer = self.create_timer(0.1, self.publish_imu_data)  # 10 Hz
+        # Make the poll period adjustable so operators can slow the IMU queries
+        # when the I2C bus is marginal (e.g. Raspberry Pi clock-stretch issues).
+        # Reducing the rate lowers traffic on the shared bus, which can improve
+        # reliability at the cost of fresher orientation estimates.
+        self.declare_parameter('poll_period_sec', 0.1)
+        poll_period = self.get_parameter('poll_period_sec').value
+        if poll_period <= 0:
+            self.get_logger().warn(
+                f"Invalid poll_period_sec={poll_period}; falling back to 0.1s")
+            poll_period = 0.1
+        self.get_logger().info(
+            f"IMU polling period set to {poll_period:.3f}s (~{1.0 / poll_period:.2f} Hz)")
+
+        self.timer = self.create_timer(poll_period, self.publish_imu_data)
         self.retry_timer = self.create_timer(5.0, self._retry_init_if_needed)
 
         self.i2c = None
