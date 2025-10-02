@@ -1,106 +1,287 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import math
+import os
+import sys
+import time
+import threading
+import signal
+from collections import deque
 
 import rclpy
 from rclpy.node import Node
-import board
-import busio
-from adafruit_bno08x.i2c import BNO08X_I2C
-from adafruit_bno08x import BNO_REPORT_ACCELEROMETER, BNO_REPORT_GYROSCOPE, BNO_REPORT_ROTATION_VECTOR
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+from rclpy.executors import SingleThreadedExecutor
+
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import String
-import math
-import time
-import os
-import sys
-from collections import deque
 
+# --- Optional robust I2C backend (ExtendedI2C) --------------------------------
+try:
+    from adafruit_extended_bus import ExtendedI2C  # /dev/i2c-*
+    _HAS_EXTENDED_I2C = True
+except Exception:
+    _HAS_EXTENDED_I2C = False
+
+# Fallback Blinka bus
+try:
+    import board
+    import busio
+except Exception:
+    board = None
+    busio = None
+
+# --- BNO08X / I2C driver ------------------------------------------------------
+from adafruit_bno08x.i2c import BNO08X_I2C
+from adafruit_bno08x import (
+    BNO_REPORT_ACCELEROMETER,
+    BNO_REPORT_GYROSCOPE,
+    BNO_REPORT_ROTATION_VECTOR,
+)
+
+# --- your local util ----------------------------------------------------------
 from .utils import quaternion_to_euler
+
 
 class IMUNode(Node):
     def __init__(self):
         super().__init__('optimized_imu_node')
 
-        self.heading_offset = -30.0  # Adjust after calibration
+        # ---- env banner ------------------------------------------------------
+        self.get_logger().info(f"[IMU] Python executable: {sys.executable}")
+        self.get_logger().info(f"[IMU] ExtendedI2C available: {_HAS_EXTENDED_I2C}")
+
+        # ---- config/state ----------------------------------------------------
+        self.heading_offset = -30.0
         self.sensor_ready = False
 
+        self._offline_published = False
+        self._shutdown_requested = False
+
+        # Health publisher QoS: Transient Local so late subscribers get the last state
+        health_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+
+        # publishers
         self.imu_publisher_ = self.create_publisher(Imu, 'imu/data', 10)
         self.rpy_publisher_ = self.create_publisher(Vector3, 'imu/euler', 10)
         self.heading_publisher_ = self.create_publisher(String, 'imu/heading', 10)
-        self.health_status_publisher = self.create_publisher(String, 'imu/health_status', 10)
+        self.health_status_publisher = self.create_publisher(String, 'imu/health_status', health_qos)
 
         self.last_health_status = None
         self.last_failure_reason = None
 
-        # Repeated data detection
+        # params
         self.declare_parameter('stagnant_timeout_sec', 3.0)
-        self.stagnant_timeout_sec = self.get_parameter('stagnant_timeout_sec').value
-        self._last_data = None
-        self._stagnant_start = None
+        self.stagnant_timeout_sec = float(self.get_parameter('stagnant_timeout_sec').value)
 
-        # Make the poll period adjustable so operators can slow the IMU queries
-        # when the I2C bus is marginal (e.g. Raspberry Pi clock-stretch issues).
-        # Reducing the rate lowers traffic on the shared bus, which can improve
-        # reliability at the cost of fresher orientation estimates.
-        self.declare_parameter('poll_period_sec', 0.1)
-        poll_period = self.get_parameter('poll_period_sec').value
+        self.declare_parameter('poll_period_sec', 0.5)
+        poll_period = float(self.get_parameter('poll_period_sec').value)
         if poll_period <= 0:
-            self.get_logger().warn(
-                f"Invalid poll_period_sec={poll_period}; falling back to 0.1s")
+            self.get_logger().warn(f"Invalid poll_period_sec={poll_period}; falling back to 0.1s")
             poll_period = 0.1
-        self.get_logger().info(
-            f"IMU polling period set to {poll_period:.3f}s (~{1.0 / poll_period:.2f} Hz)")
+        self.get_logger().info(f"IMU polling period set to {poll_period:.3f}s (~{1.0 / poll_period:.2f} Hz)")
 
+        # timers
         self.timer = self.create_timer(poll_period, self.publish_imu_data)
         self.retry_timer = self.create_timer(5.0, self._retry_init_if_needed)
 
+        # state
         self.i2c = None
         self.bno = None
+        self._imu_lock = threading.Lock()
+
+        self._last_data = None
+        self._stagnant_start = None
+        self._bad_frame_streak = 0
+        self._bad_frame_streak_limit = 2
 
         self.failure_timestamps = deque()
         self.max_failures = 3
         self.failure_window_seconds = 30
 
         self.CRITICAL_ERRORS = [
-            "No device", "Remote I/O", "Input/output error",
-            "Unprocessable Batch bytes", "Was not able to enable feature"
+            "No device",
+            "Remote I/O",
+            "Input/output error",
+            "Unprocessable Batch bytes",
+            "Was not able to enable feature",
         ]
 
         self.reset_attempts = 0
         self.max_reset_attempts = 3
 
+        # bring the sensor up
         self.initialize_sensor()
 
+    # -------------------------------------------------------------------------
+    # backend logging helpers
+    # -------------------------------------------------------------------------
+    def _log_i2c_backend(self):
+        try:
+            if _HAS_EXTENDED_I2C and isinstance(self.i2c, ExtendedI2C):
+                import adafruit_extended_bus as _mod
+                self.get_logger().info(f"[IMU] I2C backend: ExtendedI2C (from {_mod.__file__})")
+                return
+        except Exception:
+            pass
+        try:
+            import adafruit_blinka.microcontroller.generic_linux.i2c as _mod
+            self.get_logger().info(f"[IMU] I2C backend: Blinka busio (from {_mod.__file__})")
+        except Exception:
+            self.get_logger().info("[IMU] I2C backend: unknown")
+
+    def _log_bno_backend(self):
+        try:
+            import adafruit_bno08x.i2c as _bno_mod
+            self.get_logger().info(f"[IMU] BNO08X backend: BNO08X_I2C (from {_bno_mod.__file__})")
+        except Exception:
+            self.get_logger().info("[IMU] BNO08X backend: unknown")
+
+    # -------------------------------------------------------------------------
+    # I2C helpers
+    # -------------------------------------------------------------------------
+    def _new_i2c(self):
+        if _HAS_EXTENDED_I2C:
+            return ExtendedI2C(1)  # /dev/i2c-1
+        if busio is None or board is None:
+            raise RuntimeError("No I2C backend available (need adafruit_extended_bus or busio+board).")
+        return busio.I2C(board.SCL, board.SDA)
+
+    def _close_i2c(self):
+        if self.i2c is None:
+            return
+        try:
+            if hasattr(self.i2c, "deinit"):
+                self.i2c.deinit()
+            elif hasattr(self.i2c, "close"):
+                self.i2c.close()
+        except Exception as e:
+            self.get_logger().error(f"Error closing I2C: {e}")
+        finally:
+            self.i2c = None
+
+    # -------------------------------------------------------------------------
+    # feature enable
+    # -------------------------------------------------------------------------
+    def _enable_feature_safe(self, feature, hz=25):
+        report_us = max(10000, int(1_000_000 / max(1, hz)))  # >=10ms
+        for _ in range(3):
+            try:
+                try:
+                    self.bno.enable_feature(feature, report_interval=report_us, batch_interval=0)
+                except TypeError:
+                    try:
+                        self.bno.enable_feature(feature, report_interval=report_us)
+                    except TypeError:
+                        self.bno.enable_feature(feature)
+                self.get_logger().info(f"[IMU] enable_feature ok (feature=0x{feature:x})")
+                return
+            except Exception:
+                time.sleep(0.05)
+        self.bno.enable_feature(feature)
+
+    # -------------------------------------------------------------------------
+    # health publishing
+    # -------------------------------------------------------------------------
+    def publish_health_status(self, status: str, *, force: bool = False, log: bool = True):
+        """
+        Publish a health status.
+        - force=True: publish even if unchanged.
+        - log=False: suppress rosout logging (useful during shutdown).
+        """
+        if self._shutdown_requested:
+            # During teardown we only want OFFLINE; block others unless forced.
+            if status != "IMU OFFLINE" and not force:
+                return
+
+        # Never overwrite OFFLINE unless explicitly forced
+        if self.last_health_status == "IMU OFFLINE" and status != "IMU OFFLINE" and not force:
+            return
+
+        msg_text = status
+        if "UNSTABLE" in status and "Last error" not in status and self.last_failure_reason:
+            msg_text += f" | Last error: {self.last_failure_reason}"
+        elif "RESTARTING" in status and "Reason:" not in status and self.last_failure_reason:
+            msg_text += f" | Reason: {self.last_failure_reason}"
+
+        if force or msg_text != self.last_health_status:
+            m = String()
+            m.data = msg_text
+            self.health_status_publisher.publish(m)
+            if log:
+                self.get_logger().info(f"[IMU Health] {msg_text}")
+            self.last_health_status = msg_text
+
+    def mark_offline(self):
+        """Publish IMU OFFLINE once and cancel timers."""
+        if self._offline_published:
+            return
+        try:
+            self.sensor_ready = False
+            self._cancel_timers()
+            self.publish_health_status("IMU OFFLINE", force=True, log=False)
+            # Give DDS a tiny moment to deliver
+            time.sleep(0.05)
+        except Exception:
+            pass
+        self._offline_published = True
+
+    def _cancel_timers(self):
+        for t in (getattr(self, "timer", None), getattr(self, "retry_timer", None)):
+            try:
+                if t:
+                    t.cancel()
+            except Exception:
+                pass
+
+    def request_shutdown(self):
+        """Idempotent: set flag, publish OFFLINE, stop timers."""
+        if self._shutdown_requested:
+            return
+        self._shutdown_requested = True
+        self.mark_offline()
+
+    # -------------------------------------------------------------------------
+    # process control
+    # -------------------------------------------------------------------------
     def restart_process(self):
-        self.publish_health_status("IMU RESTARTING")
+        self.publish_health_status("IMU RESTARTING", force=True)
         self.get_logger().error("IMU node restarting itself now...")
         time.sleep(0.2)
         python = sys.executable
         os.execv(python, [python] + sys.argv)
 
     def reset_i2c_bus(self) -> bool:
+        if self._shutdown_requested:
+            return False
         self.get_logger().error("Attempting soft I2C reset...")
         try:
-            if self.i2c:
-                try:
-                    self.i2c.deinit()
-                except Exception as e:
-                    self.get_logger().error(f"Error deinitializing I2C: {e}")
+            self._close_i2c()
             time.sleep(0.1)
-            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.i2c = self._new_i2c()
+            self._log_i2c_backend()
             self.bno = BNO08X_I2C(self.i2c, address=0x4B)
+            self._log_bno_backend()
             time.sleep(0.2)
-            try:
-                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-                time.sleep(0.1)
-                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-                time.sleep(0.1)
-                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-            except Exception as fe:
-                self.get_logger().error(f"Critical error enabling feature: {fe}")
-                return False
+
+            self._enable_feature_safe(BNO_REPORT_ACCELEROMETER, hz=25)
+            self._enable_feature_safe(BNO_REPORT_GYROSCOPE, hz=25)
+            self._enable_feature_safe(BNO_REPORT_ROTATION_VECTOR, hz=25)
+
             self.sensor_ready = True
+            self._bad_frame_streak = 0
+            self.failure_timestamps.clear()
+            self.last_failure_reason = None
+
             self.get_logger().error("Soft reset successful.")
+            self.publish_health_status("IMU OK", force=True)   # <== ensure OK after successful reset
             return True
         except Exception as e:
             self.get_logger().error(f"Soft reset failed: {e}")
@@ -108,84 +289,65 @@ class IMUNode(Node):
             return False
 
     def record_failure_and_check_restart(self):
-        current_time = time.time()
-        self.failure_timestamps.append(current_time)
-
-        while self.failure_timestamps and (current_time - self.failure_timestamps[0] > self.failure_window_seconds):
+        if self._shutdown_requested:
+            return
+        now = time.time()
+        self.failure_timestamps.append(now)
+        while self.failure_timestamps and (now - self.failure_timestamps[0] > self.failure_window_seconds):
             self.failure_timestamps.popleft()
 
         failure_count = len(self.failure_timestamps)
-
         if failure_count >= self.max_failures:
             self.get_logger().error(
-                f"Exceeded {self.max_failures} failures within "
-                f"{self.failure_window_seconds} seconds.")
+                f"Exceeded {self.max_failures} failures within {self.failure_window_seconds} seconds."
+            )
             if self.reset_attempts < self.max_reset_attempts and self.reset_i2c_bus():
                 self.reset_attempts += 1
-                self.get_logger().info(
-                    f"Soft reset attempt {self.reset_attempts}/"
-                    f"{self.max_reset_attempts} successful")
-                self.publish_health_status("IMU SOFT RESET")
-                self.failure_timestamps.clear()
-            else:
-                self.get_logger().fatal(
-                    f"Restart after {self.reset_attempts} soft reset attempts")
-                if self.initialize_sensor_minimal():
-                    if self.i2c:
-                        try:
-                            self.i2c.deinit()
-                        except Exception as e:
-                            self.get_logger().error(
-                                f"Error shutting down minimal init: {e}")
-                        time.sleep(0.1)
-                    self.initialize_sensor()
-                    return
-                # Request a restart and report health status once
-                self.publish_health_status("IMU RESTARTING")
-                time.sleep(2)
-                self.restart_process()
+                self.get_logger().info(f"Soft reset attempt {self.reset_attempts}/{self.max_reset_attempts} successful")
+                self.publish_health_status("IMU SOFT RESET", force=True)
+                return
+            self.get_logger().fatal(f"Restart after {self.reset_attempts} soft reset attempts")
+            if self.initialize_sensor_minimal():
+                self._close_i2c()
+                time.sleep(0.1)
+                self.initialize_sensor()
+                return
+            self.publish_health_status("IMU RESTARTING", force=True)
+            time.sleep(2)
+            self.restart_process()
         else:
-            self.publish_health_status(f"IMU UNSTABLE ({failure_count} failures in last {self.failure_window_seconds} sec)")
-
-    def publish_health_status(self, status):
-        """Publish a health message when it has changed."""
-        message_text = status
-        if "UNSTABLE" in status and "Last error" not in status \
-                and self.last_failure_reason:
-            message_text += f" | Last error: {self.last_failure_reason}"
-        elif "RESTARTING" in status and "Reason:" not in status \
-                and self.last_failure_reason:
-            message_text += f" | Reason: {self.last_failure_reason}"
-
-        if message_text != self.last_health_status:
-            status_msg = String()
-            status_msg.data = message_text
-            self.health_status_publisher.publish(status_msg)
-            self.get_logger().info(f"[IMU Health] {message_text}")
-            self.last_health_status = message_text
+            self.publish_health_status(
+                f"IMU UNSTABLE ({failure_count} failures in last {self.failure_window_seconds} sec)"
+            )
 
     def _retry_init_if_needed(self):
-        if self.sensor_ready:
+        if self._shutdown_requested or self.sensor_ready:
             return
         self.record_failure_and_check_restart()
 
+    # -------------------------------------------------------------------------
+    # init paths
+    # -------------------------------------------------------------------------
     def initialize_sensor_minimal(self) -> bool:
-        """Attempt minimal setup enabling only the accelerometer."""
+        if self._shutdown_requested:
+            return False
         self.get_logger().info("Attempting minimal BNO08X initialization...")
         try:
-            if self.i2c:
-                self.i2c.deinit()
-                time.sleep(0.1)
-
-            self.i2c = busio.I2C(board.SCL, board.SDA)
-            self.bno = BNO08X_I2C(self.i2c, address=0x4B)
-            time.sleep(0.2)
-            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            self._close_i2c()
             time.sleep(0.1)
+            self.i2c = self._new_i2c()
+            self._log_i2c_backend()
+            self.bno = BNO08X_I2C(self.i2c, address=0x4B)
+            self._log_bno_backend()
+            time.sleep(0.2)
+
+            self._enable_feature_safe(BNO_REPORT_ACCELEROMETER, hz=25)
 
             self.sensor_ready = True
             self.failure_timestamps.clear()
-            self.publish_health_status("IMU MINIMAL OK")
+            self._bad_frame_streak = 0
+            self.last_failure_reason = None
+            self.publish_health_status("IMU MINIMAL OK", force=True)
             self.get_logger().info("Minimal initialization successful.")
             return True
         except Exception as e:
@@ -195,107 +357,99 @@ class IMUNode(Node):
             return False
 
     def initialize_sensor(self):
+        if self._shutdown_requested:
+            return
         self.get_logger().info("Initializing BNO08X sensor...")
-
-        # Mark the sensor offline while we reconfigure hardware features so the
-        # publish loop pauses and the retry timer can run if anything fails.
         self.sensor_ready = False
-
         try:
-            if self.i2c:
-                self.i2c.deinit()
-                time.sleep(0.1)
-
-            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self._close_i2c()
+            time.sleep(0.1)
+            self.i2c = self._new_i2c()
+            self._log_i2c_backend()
             self.bno = BNO08X_I2C(self.i2c, address=0x4B)
-
-            # Try enabling features one by one
+            self._log_bno_backend()
             time.sleep(0.2)
+
             try:
-                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-                time.sleep(0.1)
-                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)#if error to enable feature, comment here and run script again, then uncomment and run again.
-                time.sleep(0.1)
-                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-                time.sleep(0.1)
+                self._enable_feature_safe(BNO_REPORT_ACCELEROMETER, hz=25)
+                self._enable_feature_safe(BNO_REPORT_GYROSCOPE, hz=25)
+                self._enable_feature_safe(BNO_REPORT_ROTATION_VECTOR, hz=25)
             except Exception as feature_e:
-                self.get_logger().error(
-                    f"Critical error enabling feature: {feature_e}")
+                self.get_logger().error(f"Critical error enabling feature: {feature_e}")
                 self.last_failure_reason = str(feature_e)
-                self.get_logger().error(
-                    "Invoking failure handler: will attempt soft reset before any restart")
+                self.get_logger().error("Invoking failure handler: soft reset then restart if needed")
                 self.sensor_ready = False
                 self.record_failure_and_check_restart()
                 return
 
-            time.sleep(0.5)
+            time.sleep(0.2)
 
             self.sensor_ready = True
             self.failure_timestamps.clear()
-            self.publish_health_status("IMU OK")
+            self._bad_frame_streak = 0
+            self.last_failure_reason = None
+            self.publish_health_status("IMU OK", force=True)
             self.get_logger().info("Sensor initialized and ready.")
-
         except Exception as e:
             self.sensor_ready = False
             self.last_failure_reason = str(e)
             self.get_logger().error(f"Error initializing sensor: {e}")
-
-            if any(keyword in self.last_failure_reason for keyword in self.CRITICAL_ERRORS):
+            if any(k in self.last_failure_reason for k in self.CRITICAL_ERRORS):
                 self.record_failure_and_check_restart()
 
-
+    # -------------------------------------------------------------------------
+    # main loop
+    # -------------------------------------------------------------------------
     def publish_imu_data(self):
-        if not self.sensor_ready:
+        if self._shutdown_requested or not self.sensor_ready:
             return
 
         try:
-            quat_i, quat_j, quat_k, quat_real = self.bno.quaternion
-            accel_x, accel_y, accel_z = self.bno.acceleration
-            gyro_x, gyro_y, gyro_z = self.bno.gyro
+            with self._imu_lock:
+                qi, qj, qk, qr = self.bno.quaternion
+                ax, ay, az = self.bno.acceleration
+                gx, gy, gz = self.bno.gyro
 
-            current_tuple = (
-                quat_i, quat_j, quat_k, quat_real,
-                accel_x, accel_y, accel_z,
-                gyro_x, gyro_y, gyro_z,
-            )
+            current_tuple = (qi, qj, qk, qr, ax, ay, az, gx, gy, gz)
 
             if current_tuple == self._last_data:
                 if self._stagnant_start is None:
                     self._stagnant_start = time.time()
                 elif time.time() - self._stagnant_start >= self.stagnant_timeout_sec:
                     self.get_logger().error('IMU data unchanged beyond timeout; restarting')
-                    self.publish_health_status('IMU STAGNANT')
+                    self.publish_health_status('IMU STAGNANT', force=True)
                     self.restart_process()
                     return
             else:
                 self._last_data = current_tuple
                 self._stagnant_start = time.time()
 
-            # === Data Validation ===
-            if not self.validate_imu_data(quat_i, quat_j, quat_k, quat_real, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z):
-                self.get_logger().warn("Invalid IMU data detected. Skipping publish.")
-                self.publish_health_status("IMU HICCUP | Invalid sensor data detected")
+            # validation with small streak to avoid flapping
+            if not self.validate_imu_data(qi, qj, qk, qr, ax, ay, az, gx, gy, gz):
+                self._bad_frame_streak += 1
+                if self._bad_frame_streak >= self._bad_frame_streak_limit:
+                    self.publish_health_status("IMU HICCUP | Invalid sensor data detected", force=True)
                 return
+            else:
+                self._bad_frame_streak = 0
 
-            # === Publish valid data ===
             imu_msg = Imu()
-            imu_msg.orientation.x = quat_i
-            imu_msg.orientation.y = quat_j
-            imu_msg.orientation.z = quat_k
-            imu_msg.orientation.w = quat_real
-            imu_msg.angular_velocity.x = gyro_x
-            imu_msg.angular_velocity.y = gyro_y
-            imu_msg.angular_velocity.z = gyro_z
-            imu_msg.linear_acceleration.x = accel_x
-            imu_msg.linear_acceleration.y = accel_y
-            imu_msg.linear_acceleration.z = accel_z
+            imu_msg.orientation.x = qi
+            imu_msg.orientation.y = qj
+            imu_msg.orientation.z = qk
+            imu_msg.orientation.w = qr
+            imu_msg.angular_velocity.x = gx
+            imu_msg.angular_velocity.y = gy
+            imu_msg.angular_velocity.z = gz
+            imu_msg.linear_acceleration.x = ax
+            imu_msg.linear_acceleration.y = ay
+            imu_msg.linear_acceleration.z = az
             imu_msg.orientation_covariance[0] = -1
             imu_msg.angular_velocity_covariance[0] = -1
             imu_msg.linear_acceleration_covariance[0] = -1
-
             self.imu_publisher_.publish(imu_msg)
 
-            roll, pitch, yaw = quaternion_to_euler(quat_i, quat_j, quat_k, quat_real)
+            roll, pitch, yaw = quaternion_to_euler(qi, qj, qk, qr)
             rpy_msg = Vector3()
             rpy_msg.x = roll
             rpy_msg.y = pitch
@@ -307,56 +461,86 @@ class IMUNode(Node):
             heading_msg.data = f'Heading: {self.yaw_to_cardinal(heading_degrees)}, {heading_degrees:.2f} degrees'
             self.heading_publisher_.publish(heading_msg)
 
-            # === Recovery Health Reporting ===
             if self.last_health_status != "IMU OK":
-                self.publish_health_status("IMU OK")
+                self.publish_health_status("IMU OK", force=True)
 
         except Exception as e:
             self.last_failure_reason = str(e)
             self.get_logger().error(f"Sensor read error: {e}")
 
+            # Fast-path resyncs for framing/short-read style errors
+            if (isinstance(e, IndexError)
+                or "Unprocessable Batch bytes" in self.last_failure_reason
+                or "Input/output error" in self.last_failure_reason
+                or "Remote I/O" in self.last_failure_reason
+                or self.last_failure_reason.strip() in {"0","120","123","125","129","133","254","255"}):
+                if self.reset_i2c_bus():
+                    return  # reset already published IMU OK
+
             if any(keyword in self.last_failure_reason for keyword in self.CRITICAL_ERRORS):
-                self.get_logger().warn(f"Critical failure detected: {e}")
                 self.record_failure_and_check_restart()
             else:
-                self.publish_health_status(f"IMU HICCUP | Last error: {self.last_failure_reason}")
+                self.publish_health_status(f"IMU HICCUP | Last error: {self.last_failure_reason}", force=True)
 
-
-
+    # -------------------------------------------------------------------------
+    # helpers
+    # -------------------------------------------------------------------------
     def yaw_to_cardinal(self, heading_degrees):
         directions = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West']
         index = round(heading_degrees / 45.0) % 8
         return directions[index]
-    
+
     def validate_imu_data(self, qi, qj, qk, qr, ax, ay, az, gx, gy, gz):
-        # Validate quaternion: check near unit length
         quat_norm = math.sqrt(qi**2 + qj**2 + qk**2 + qr**2)
-        if abs(quat_norm - 1.0) > 0.2:  # Allow small error
+        if not (0.7 <= quat_norm <= 1.3):
             return False
-
-        # Validate acceleration: magnitude reasonable (Earth gravity ~9.8 m/s²)
-        accel_magnitude = math.sqrt(ax**2 + ay**2 + az**2)
-        if accel_magnitude < 5.0 or accel_magnitude > 20.0:  # Accept 5-20 m/s² range
+        accel_mag = math.sqrt(ax**2 + ay**2 + az**2)
+        if not (3.0 <= accel_mag <= 25.0):
             return False
-
-        # Validate gyro: unrealistic spin rates (e.g., > 2000 deg/s) should not happen
         gyro_threshold = math.radians(2000)  # ~35 rad/s
-        if any(abs(g) > gyro_threshold for g in [gx, gy, gz]):
+        if any(abs(g) > gyro_threshold for g in (gx, gy, gz)):
             return False
-
         return True
+
+
+# ---- signal wiring ------------------------------------------------------------
+def _install_exit_signals(node: IMUNode):
+    """Ensure OFFLINE fires and our manual loop exits on SIGINT/SIGTERM."""
+    def _handler(signum, frame):
+        node.request_shutdown()   # publish OFFLINE + stop timers
+        # DO NOT call rclpy.shutdown() here — we still need ROS alive to ship the OFFLINE message.
+    signal.signal(signal.SIGINT, _handler)
+    signal.signal(signal.SIGTERM, _handler)
 
 
 def main(args=None):
     rclpy.init(args=args)
-    imu_node = IMUNode()
+    node = IMUNode()
+    _install_exit_signals(node)
+
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
+
     try:
-        rclpy.spin(imu_node)
-    except KeyboardInterrupt:
-        imu_node.get_logger().info('Keyboard interrupt, shutting down.')
+        # Manual spin: exits when Ctrl-C sets node._shutdown_requested = True
+        while not node._shutdown_requested:
+            executor.spin_once(timeout_sec=0.1)
     finally:
-        imu_node.destroy_node()
-        rclpy.shutdown()
+        # Guarantee OFFLINE once, then shut middleware down.
+        node.request_shutdown()
+        try:
+            executor.shutdown()
+        except Exception:
+            pass
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass
+
 
 if __name__ == '__main__':
     main()
