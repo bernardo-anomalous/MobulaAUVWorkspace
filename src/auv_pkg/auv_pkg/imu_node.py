@@ -197,6 +197,10 @@ class IMUNode(Node):
     def initialize_sensor(self):
         self.get_logger().info("Initializing BNO08X sensor...")
 
+        # Mark the sensor offline while we reconfigure hardware features so the
+        # publish loop pauses and the retry timer can run if anything fails.
+        self.sensor_ready = False
+
         try:
             if self.i2c:
                 self.i2c.deinit()
@@ -220,6 +224,7 @@ class IMUNode(Node):
                 self.last_failure_reason = str(feature_e)
                 self.get_logger().error(
                     "Invoking failure handler: will attempt soft reset before any restart")
+                self.sensor_ready = False
                 self.record_failure_and_check_restart()
                 return
 
