@@ -4,6 +4,7 @@
 
 - **Extended I²C backend (Linux):**  
   ```bash
+  pip install adafruit-extended-bus --break-system-packages #system wide isntall recommended
   pip install --user adafruit-extended-bus
   ```
 - **Adafruit BNO08x driver (public release):**  
