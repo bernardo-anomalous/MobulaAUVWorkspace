@@ -81,7 +81,7 @@ class IMUNode(Node):
         self.declare_parameter('stagnant_timeout_sec', 3.0)
         self.stagnant_timeout_sec = float(self.get_parameter('stagnant_timeout_sec').value)
 
-        self.declare_parameter('poll_period_sec', 0.5)
+        self.declare_parameter('poll_period_sec', 0.1) #times per second to poll data
         poll_period = float(self.get_parameter('poll_period_sec').value)
         if poll_period <= 0:
             self.get_logger().warn(f"Invalid poll_period_sec={poll_period}; falling back to 0.1s")
