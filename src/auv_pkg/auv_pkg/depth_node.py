@@ -16,7 +16,7 @@ class DepthSensorNode(Node):
         self.air_publisher_ = self.create_publisher(Float32, '/depth_air', 10)
 
         # Sensor setup
-        self.sensor = ms5837.MS5837_30BA(bus=0)
+        self.sensor = ms5837.MS5837_30BA(bus=1)
         if not self.sensor.init():
             self.get_logger().error("❌ Sensor could not be initialized! Check wiring and power.")
             raise RuntimeError("Sensor initialization failed")
