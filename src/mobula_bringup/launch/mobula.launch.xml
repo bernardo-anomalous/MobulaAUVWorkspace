@@ -11,4 +11,5 @@
     <node pkg="auv_pkg" exec="roll_pid"/>
     <node pkg="auv_pkg" exec="depth_sensor"/>
     <node pkg="auv_pkg" exec="acceleration_node"/> 
+    <node pkg="auv_pkg" exec="battery_node"/> 
 </launch>
