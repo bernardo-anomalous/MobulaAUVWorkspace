@@ -136,6 +136,19 @@ class Pack:
         self.pub_eta_min      = node.create_publisher(Float32, f"{base}/eta_min"  , 10)  # behavior-based
         self.pub_est_topic    = node.create_publisher(String , f"{base}/behavior_based_estimation", 10)
         self.pub_voltage_state = node.create_publisher(String, f"{base}/voltage_state", qos_transient)
+        self.pub_current_monitor = node.create_publisher(String, f"{base}/current_monitor", qos_transient)
+        self.pub_current_critical = node.create_publisher(String, f"{base}/current_draw_critical", qos_transient)
+
+        # current monitoring state
+        self.EXPECTED_MAX_A = 6.0
+        self.IMPORTANT_CURRENT_A = 6.0
+        self.CRITICAL_CURRENT_A = 8.0
+        self.FUSE_RATING_A = 10.0
+        self.FUSE_NEAR_THRESHOLD_A = 9.0
+        self.current_max_A = 0.0
+        self.current_max_timestamp: Optional[float] = None
+        self._last_current_severity = "NORMAL"
+        self._last_logged_current = 0.0
 
     # --------- I2C bring-up ----------
     def _new_i2c(self):
@@ -277,6 +290,7 @@ class Pack:
 
             summary.data += f" state={state_label}"
             self.pub_summary.publish(summary)
+            self._monitor_current(i_A, t_now)
             return v_V, i_A, p_W, soc
 
         except Exception as e:
@@ -323,6 +337,78 @@ class Pack:
         self.node.get_logger().info(
             f"[INA260/{self.name}] baseline from OCV {soc_ocv:.1f}% -> used {self.used_mAh:.0f}mAh"
         )
+
+    def _monitor_current(self, current_A: float, t_now: float) -> None:
+        """Monitor current draw and publish/log threshold crossings."""
+        severity = "NORMAL"
+        if current_A > self.CRITICAL_CURRENT_A:
+            severity = "CRITICAL"
+        elif current_A > self.IMPORTANT_CURRENT_A:
+            severity = "IMPORTANT"
+
+        if severity == "NORMAL":
+            if self._last_current_severity != "NORMAL":
+                self._last_current_severity = "NORMAL"
+            return
+
+        timestamp = self._format_time(t_now)
+        near_fuse = current_A >= self.FUSE_NEAR_THRESHOLD_A
+
+        highest_updated = False
+        if current_A > (self.current_max_A + 1e-6):
+            self.current_max_A = current_A
+            self.current_max_timestamp = t_now
+            highest_updated = True
+
+        payload = {
+            "pack": self.name,
+            "severity": severity,
+            "current_A": round(current_A, 3),
+            "timestamp": timestamp,
+            "expected_max_A": self.EXPECTED_MAX_A,
+            "important_min_A": self.IMPORTANT_CURRENT_A,
+            "critical_min_A": self.CRITICAL_CURRENT_A,
+            "fuse_rating_A": self.FUSE_RATING_A,
+            "near_fuse": near_fuse,
+        }
+
+        if self.current_max_timestamp is not None:
+            payload["highest_recorded"] = {
+                "current_A": round(self.current_max_A, 3),
+                "timestamp": self._format_time(self.current_max_timestamp),
+            }
+
+        should_log = severity != self._last_current_severity or highest_updated or (
+            abs(current_A - self._last_logged_current) >= 0.1
+        )
+
+        if should_log:
+            msg = (
+                f"[INA260/{self.name}] {severity} current draw {current_A:.2f}A "
+                f"at {timestamp}"
+            )
+            if near_fuse:
+                msg += " (near fuse limit 10.0A)"
+            if severity == "CRITICAL":
+                self.node.get_logger().error(msg)
+            else:
+                self.node.get_logger().warn(msg)
+            self._last_logged_current = current_A
+
+            data = String()
+            data.data = json.dumps(payload, separators=(",", ":"))
+            self.pub_current_monitor.publish(data)
+
+            if severity == "CRITICAL":
+                critical_msg = String()
+                critical_msg.data = data.data
+                self.pub_current_critical.publish(critical_msg)
+
+        self._last_current_severity = severity
+
+    @staticmethod
+    def _format_time(ts: float) -> str:
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
 
 # ----------------------------- Node --------------------------------
 class BatteryNode(Node):
