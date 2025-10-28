@@ -62,6 +62,7 @@ class ServoInterpolationNodeV3(Node):
         self.operational_mode = 'energy_efficient'
         self.priority = 0
         self.deadline = rclpy.time.Time()
+        self.paused = False
 
         self.publish_hold_state()
 
@@ -149,7 +150,7 @@ class ServoInterpolationNodeV3(Node):
         # jumps at the end of canned messages so it has been removed. Servos now
         # maintain the final target angles provided in the command.
 
-        if self.timer is None:
+        if self.timer is None and not self.paused:
             self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
 
 
@@ -186,7 +187,7 @@ class ServoInterpolationNodeV3(Node):
         return 1 - math.pow(2, -10 * t) if t != 1 else 1
 
     def publish_next_step(self):
-        if self.hold_active:
+        if self.paused:
             return
         if self.current_step_index >= len(self.steps):
             if self.timer:
@@ -223,8 +224,16 @@ class ServoInterpolationNodeV3(Node):
         self.hold_active = msg.hold
         if self.hold_active:
             self.get_logger().info('Servo interpolation hold requested; pausing command execution.')
+            self.paused = True
+            if self.timer:
+                self.timer.cancel()
+            self.timer = None
         else:
-            self.get_logger().info('Servo interpolation hold released; resuming command execution.')
+            self.get_logger().info('Servo interpolation hold released; resuming queued command execution.')
+            # Resume the existing interpolation sequence so queued steps complete.
+            self.paused = False
+            if self.current_step_index < len(self.steps) and self.timer is None:
+                self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
         self.publish_hold_state()
 
     def publish_hold_state(self):
