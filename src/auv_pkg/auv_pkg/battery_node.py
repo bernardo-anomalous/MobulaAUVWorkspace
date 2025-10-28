@@ -104,6 +104,7 @@ class Pack:
         self.used_mAh = 0.0
         self.used_Wh = 0.0
         self.last_ts = None
+        self._needs_baseline = True
 
         # behavior-based estimates (simple moving average over N seconds)
         self.window_sec = int(max(60, node.get_parameter("behavior_window_sec").value))
@@ -149,12 +150,15 @@ class Pack:
             # sanity read
             _ = self.ina.voltage
             self.present = True
+            self._needs_baseline = True
+            self.last_ts = None
             self.node.get_logger().info(f"[INA260/{self.name}] online @0x{self.addr:02X} on bus {self.i2c_bus_id}")
             self.pub_present.publish(Bool(data=True))
         except Exception as e:
             # stay non-blocking
             self.present = False
             self.ina = None
+            self.last_ts = None
             # only log occasionally
             self.node.get_logger().warn(f"[INA260/{self.name}] not ready: {e}")
             self.pub_present.publish(Bool(data=False))
@@ -179,6 +183,10 @@ class Pack:
             # Convert to A / W consistently
             i_A = i_mA / 1000.0
             p_W = p_mW / 1000.0
+
+            if self._needs_baseline:
+                self._apply_ocv_baseline(v_V)
+                self._needs_baseline = False
 
             # Integrate with correct units
             if self.last_ts is None:
@@ -240,6 +248,22 @@ class Pack:
             self.present = False
             self.pub_present.publish(Bool(data=False))
             return None
+
+    def _apply_ocv_baseline(self, v_pack: float) -> None:
+        """Align counters to the estimated SoC derived from the present voltage."""
+        soc_ocv = lipo_3s_soc_from_voltage(v_pack)
+        frac_used = max(0.0, min(1.0, 1.0 - (soc_ocv / 100.0)))
+
+        cap_mAh = max(1.0, float(self.capacity_mAh))
+        pack_wh_nom = (cap_mAh / 1000.0) * 11.1
+
+        # Update counters so coulomb counting starts from the observed state of charge
+        self.used_mAh = frac_used * cap_mAh
+        self.used_Wh = frac_used * pack_wh_nom
+
+        self.node.get_logger().info(
+            f"[INA260/{self.name}] baseline from OCV {soc_ocv:.1f}% -> used {self.used_mAh:.0f}mAh"
+        )
 
 # ----------------------------- Node --------------------------------
 class BatteryNode(Node):
