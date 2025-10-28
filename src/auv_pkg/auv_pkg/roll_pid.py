@@ -2,9 +2,10 @@
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import Float32, Bool
-from auv_custom_interfaces.msg import ServoMovementCommand
+from auv_custom_interfaces.msg import ServoMovementCommand, HoldRequest
 
 class WingRollController(Node):
     def __init__(self):
@@ -41,9 +42,22 @@ class WingRollController(Node):
         # Smoothing factor for IMU noise (tune between 0.5 and 0.9)
         self.alpha = 0.8
 
-        # Activation flag
+        # Activation flags
+        self.pid_enabled = True
+        self.hold_active = False
         self.pid_active = True
         self.last_pid_active_state = True
+
+        # Hold state publisher/subscriber with transient local QoS
+        hold_qos = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.hold_state_publisher = self.create_publisher(HoldRequest, 'wing_hold_request', hold_qos)
+        self.create_subscription(HoldRequest, 'wing_hold_request', self.hold_request_callback, hold_qos)
+        self._last_published_hold_state = None
 
         # Publisher
         self.servo_publisher = self.create_publisher(ServoMovementCommand, 'servo_driver_commands', 10)
@@ -52,6 +66,8 @@ class WingRollController(Node):
         self.create_subscription(Float32, 'target_roll', self.target_roll_callback, 10)
         self.create_subscription(Vector3, 'imu/euler', self.imu_callback, 10)
         self.create_subscription(Bool, 'wing_pid_active', self.pid_activation_callback, 10)
+
+        self.publish_hold_state()
 
         # Timer for PID updates
         self.timer = self.create_timer(0.033, self.update_pid)  # Update at ~30 Hz
@@ -78,14 +94,37 @@ class WingRollController(Node):
         self.imu_data_valid = True
 
     def pid_activation_callback(self, msg):
-        was_active = self.pid_active
-        self.pid_active = msg.data
-        if self.pid_active and not was_active:
+        self.pid_enabled = msg.data
+        self.update_pid_activation_state()
+
+    def hold_request_callback(self, msg):
+        if msg.hold == self.hold_active:
+            return
+        self.hold_active = msg.hold
+        if self.hold_active:
+            self.get_logger().info('Received wing hold request; suspending roll PID updates.')
+        else:
+            self.get_logger().info('Received wing resume request; resuming roll PID updates when enabled.')
+        self.update_pid_activation_state()
+
+    def publish_hold_state(self):
+        if self._last_published_hold_state == self.hold_active:
+            return
+        msg = HoldRequest()
+        msg.hold = self.hold_active
+        self.hold_state_publisher.publish(msg)
+        self._last_published_hold_state = self.hold_active
+
+    def update_pid_activation_state(self):
+        new_state = self.pid_enabled and not self.hold_active
+        if new_state and not self.pid_active:
             # Reset recovery ramp when PID control is re-enabled
             self.recovery_factor = 0.0
             self.integral_error_roll = 0.0
             self.previous_error_roll = 0.0
             self.previous_correction_roll = 0.0
+        self.pid_active = new_state
+        self.publish_hold_state()
 
     def update_pid(self):
         if not self.pid_active:
