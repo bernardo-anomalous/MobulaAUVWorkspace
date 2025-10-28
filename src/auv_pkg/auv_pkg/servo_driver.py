@@ -4,7 +4,13 @@ import rclpy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import State, TransitionCallbackReturn
 from std_msgs.msg import Float32MultiArray, String
-from auv_custom_interfaces.msg import ServoMovementCommand
+from auv_custom_interfaces.msg import ServoMovementCommand, HoldRequest
+from rclpy.qos import (
+    QoSDurabilityPolicy,
+    QoSHistoryPolicy,
+    QoSProfile,
+    QoSReliabilityPolicy,
+)
 from adafruit_motor.servo import Servo
 from adafruit_pca9685 import PCA9685
 import board
@@ -46,6 +52,9 @@ class ServoDriverNode(LifecycleNode):
         self.last_published_status = None
         self.executing_movement = False
         self.current_movement_type = ''
+        self.hold_active = False
+        self.hold_state_subscription = None
+        self._last_base_status_message = None
         self._publish_busy_status("starting up")
 
         # Lifecycle state tracking
@@ -252,6 +261,19 @@ class ServoDriverNode(LifecycleNode):
             self.tail_command_subscriber = self.create_subscription(
                 ServoMovementCommand, 'tail_commands', self._servo_command_callback, 10)
 
+            hold_qos = QoSProfile(
+                history=QoSHistoryPolicy.KEEP_LAST,
+                depth=1,
+                reliability=QoSReliabilityPolicy.RELIABLE,
+                durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            )
+            self.hold_state_subscription = self.create_subscription(
+                HoldRequest,
+                'wing_hold_request',
+                self._hold_state_callback,
+                hold_qos,
+            )
+
             self.get_logger().info('Configuration successful.')
             self.last_lifecycle_state = 'inactive'
             self._publish_lifecycle_state()
@@ -265,6 +287,16 @@ class ServoDriverNode(LifecycleNode):
             self._publish_lifecycle_state()
             return TransitionCallbackReturn.FAILURE
 
+
+    def _hold_state_callback(self, msg: HoldRequest):
+        self.hold_active = bool(msg.hold)
+        if self.debug_logging:
+            self.get_logger().info(
+                f"Received wing hold state update: {'active' if self.hold_active else 'released'}"
+            )
+        # Republishes the most recent status with updated hold context for visibility.
+        if self._last_base_status_message is not None:
+            self._publish_busy_status(self._last_base_status_message, force=True)
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Activating Servo Driver Node...')
@@ -354,13 +386,19 @@ class ServoDriverNode(LifecycleNode):
         state_msg.data = self.last_lifecycle_state
         self.lifecycle_state_publisher.publish(state_msg)
 
-    def _publish_busy_status(self, status_message: str):
-        if status_message != self.last_published_status:
+    def _publish_busy_status(self, status_message: str, *, force: bool = False):
+        self._last_base_status_message = status_message
+        enriched_message = self._compose_status_message(status_message)
+        if force or enriched_message != self.last_published_status:
             status_msg = String()
-            status_msg.data = status_message
+            status_msg.data = enriched_message
             self.busy_status_publisher.publish(status_msg)
             self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
-            self.last_published_status = status_message
+            self.last_published_status = enriched_message
+
+    def _compose_status_message(self, base_message: str) -> str:
+        hold_descriptor = 'wing hold active' if self.hold_active else 'wing hold released'
+        return f"{base_message} | {hold_descriptor}"
 
 def main(args=None):
     rclpy.init(args=args)
