@@ -247,18 +247,24 @@ class Pack:
             self.pub_soc.publish(Float32(data=soc))
             self.pub_used_mAh.publish(Float32(data=self.used_mAh))
             self.pub_used_Wh.publish(Float32(data=self.used_Wh))
-            eta_str = "--"
+            eta_summary = "ETA=--"
             if math.isfinite(eta_min):
-                eta_str = f"{eta_min:.1f}min"
+                total_seconds = int(round(max(0.0, eta_min) * 60.0))
+                eta_hours = total_seconds // 3600
+                eta_minutes = (total_seconds % 3600) // 60
+                eta_clock = f"{eta_hours:02d}h {eta_minutes:02d}m"
+                eta_summary = f"ETA={eta_clock} (~{eta_min:.1f}min)"
                 self.pub_eta_min.publish(Float32(data=eta_min))
-                self.pub_est_topic.publish(String(data=f"{self.name}: avgP~{avg_p:.2f}W ETA~{eta_min:.1f}min"))
+                self.pub_est_topic.publish(
+                    String(data=f"{self.name}: avgP~{avg_p:.2f}W ETA~{eta_clock} (~{eta_min:.1f}min)")
+                )
 
             # Summary (human)
             summary = String()
             summary.data = (
-                f"{self.name}: V={v_V:.2f}V I={i_A:.3f}A P~{p_W:.2f}W "
+                f"{self.name}: {eta_summary} | V={v_V:.2f}V I={i_A:.3f}A P~{p_W:.2f}W "
                 f"SoC={soc:.1f}% used={self.used_mAh:.0f}mAh/{self.capacity_mAh:.0f}mAh "
-                f"avgP~{avg_p:.2f}W ETA={eta_str}"
+                f"avgP~{avg_p:.2f}W"
             )
             self.pub_summary.publish(summary)
             return v_V, i_A, p_W, soc
