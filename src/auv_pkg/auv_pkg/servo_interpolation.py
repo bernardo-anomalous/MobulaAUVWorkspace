@@ -1,8 +1,8 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import Float32MultiArray
-from auv_custom_interfaces.msg import ServoMovementCommand
-from rclpy.timer import Timer
+from auv_custom_interfaces.msg import ServoMovementCommand, HoldRequest
 import numpy as np
 import math
 
@@ -26,6 +26,17 @@ class ServoInterpolationNodeV3(Node):
 
         # === Publishers and Subscribers ===
         self.publisher = self.create_publisher(ServoMovementCommand, 'servo_driver_commands', 10)
+
+        hold_qos = QoSProfile(
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.hold_state_publisher = self.create_publisher(HoldRequest, 'wing_hold_request', hold_qos)
+        self.create_subscription(HoldRequest, 'wing_hold_request', self.hold_state_callback, hold_qos)
+        self.hold_active = False
+        self._last_published_hold_state = None
 
         self.command_subscriber = self.create_subscription(
             ServoMovementCommand,
@@ -52,6 +63,8 @@ class ServoInterpolationNodeV3(Node):
         self.priority = 0
         self.deadline = rclpy.time.Time()
 
+        self.publish_hold_state()
+
     def current_angles_callback(self, msg):
         # Resize the internal array to match the incoming data so we can
         # accommodate all available servos.
@@ -65,6 +78,9 @@ class ServoInterpolationNodeV3(Node):
         if not self.initial_angles_set:
             # self.get_logger().warn('Current servo angles not yet received. Ignoring command.')  # Commented out for optimization
             return
+
+        if self.hold_active:
+            self.get_logger().info('Hold request active; queuing new servo interpolation without executing until resume.')
 
         # Cancel any in-progress interpolation so new instructions take effect
         if self.timer is not None:
@@ -170,6 +186,8 @@ class ServoInterpolationNodeV3(Node):
         return 1 - math.pow(2, -10 * t) if t != 1 else 1
 
     def publish_next_step(self):
+        if self.hold_active:
+            return
         if self.current_step_index >= len(self.steps):
             if self.timer:
                 self.timer.cancel()
@@ -198,6 +216,24 @@ class ServoInterpolationNodeV3(Node):
         self.current_step_index += 1
         # Update tracked angles for the addressed servos only
         self.current_angles[command.servo_numbers] = step['angles']
+
+    def hold_state_callback(self, msg):
+        if msg.hold == self.hold_active:
+            return
+        self.hold_active = msg.hold
+        if self.hold_active:
+            self.get_logger().info('Servo interpolation hold requested; pausing command execution.')
+        else:
+            self.get_logger().info('Servo interpolation hold released; resuming command execution.')
+        self.publish_hold_state()
+
+    def publish_hold_state(self):
+        if self._last_published_hold_state == self.hold_active:
+            return
+        msg = HoldRequest()
+        msg.hold = self.hold_active
+        self.hold_state_publisher.publish(msg)
+        self._last_published_hold_state = self.hold_active
 
     def publish_end_command(self):
         command = ServoMovementCommand()
