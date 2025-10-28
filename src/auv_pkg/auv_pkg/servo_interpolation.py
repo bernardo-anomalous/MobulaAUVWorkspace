@@ -228,6 +228,7 @@ class ServoInterpolationNodeV3(Node):
         if self.hold_active:
             self.get_logger().info('Servo interpolation hold requested; pausing and clearing queued commands.')
             self.paused = True
+            was_running = self.timer is not None or len(self.steps) > 0
             if self.timer:
                 self.timer.cancel()
             self.timer = None
