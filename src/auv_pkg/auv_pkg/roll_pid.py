@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from typing import Optional
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSDurabilityPolicy, QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
@@ -47,6 +49,22 @@ class WingRollController(Node):
         self.hold_active = False
         self.pid_active = True
         self.last_pid_active_state = True
+        self.local_hold_requested = False
+
+        # Roll hold thresholds
+        self.declare_parameter('hold_threshold_deg', 20.0)
+        self.declare_parameter('release_threshold_deg', 10.0)
+        self.hold_threshold_deg = max(0.0, float(self.get_parameter('hold_threshold_deg').value))
+        self.release_threshold_deg = max(0.0, float(self.get_parameter('release_threshold_deg').value))
+        if self.release_threshold_deg > self.hold_threshold_deg:
+            self.get_logger().warn(
+                'release_threshold_deg (%.2f°) exceeds hold_threshold_deg (%.2f°); clamping release threshold.',
+                self.release_threshold_deg,
+                self.hold_threshold_deg,
+            )
+            self.release_threshold_deg = self.hold_threshold_deg
+
+        self.last_roll_error_deg = 0.0
 
         # Hold state publisher/subscriber with transient local QoS
         hold_qos = QoSProfile(
@@ -99,11 +117,15 @@ class WingRollController(Node):
 
     def hold_request_callback(self, msg):
         if msg.hold == self.hold_active:
+            if not msg.hold:
+                self.local_hold_requested = False
             return
         self.hold_active = msg.hold
         if self.hold_active:
+            self.local_hold_requested = False
             self.get_logger().info('Received wing hold request; suspending roll PID updates.')
         else:
+            self.local_hold_requested = False
             self.get_logger().info('Received wing resume request; resuming roll PID updates when enabled.')
         self.update_pid_activation_state()
 
@@ -126,12 +148,54 @@ class WingRollController(Node):
         self.pid_active = new_state
         self.publish_hold_state()
 
+    def _set_hold_state_from_local(self, hold_active: bool, error_deg: Optional[float] = None):
+        if hold_active:
+            if self.local_hold_requested or self.hold_active:
+                return
+            if error_deg is not None:
+                self.get_logger().info(
+                    'Roll error %.2f° exceeded %.2f°; requesting wing hold.',
+                    error_deg,
+                    self.hold_threshold_deg,
+                )
+            else:
+                self.get_logger().info('Roll error exceeded hold threshold; requesting wing hold.')
+            self.local_hold_requested = True
+            self.hold_active = True
+            self.update_pid_activation_state()
+            return
+
+        if not self.local_hold_requested:
+            return
+
+        self.local_hold_requested = False
+        if self.hold_active:
+            if error_deg is not None:
+                self.get_logger().info(
+                    'Roll error %.2f° dropped below %.2f°; releasing wing hold.',
+                    error_deg,
+                    self.release_threshold_deg,
+                )
+            else:
+                self.get_logger().info('Roll error dropped below release threshold; releasing wing hold.')
+            self.hold_active = False
+            self.update_pid_activation_state()
+
+    def _evaluate_hold_thresholds(self, error_deg: float):
+        if not self.local_hold_requested and error_deg >= self.hold_threshold_deg:
+            self._set_hold_state_from_local(True, error_deg)
+            return
+
+        if self.local_hold_requested and error_deg <= self.release_threshold_deg:
+            self._set_hold_state_from_local(False, error_deg)
+
     def update_pid(self):
         if not self.pid_active:
             if self.last_pid_active_state:
                 self.get_logger().info("Wing PID controllers deactivated.")
                 self.last_pid_active_state = False
-            return
+            if not self.local_hold_requested:
+                return
         else:
             if not self.last_pid_active_state:
                 self.get_logger().info("Wing PID controllers activated.")
@@ -162,6 +226,12 @@ class WingRollController(Node):
             return
 
         # Roll PID calculations
+        absolute_error_roll = abs(self.target_roll - self.current_roll)
+        self.last_roll_error_deg = absolute_error_roll
+        self._evaluate_hold_thresholds(absolute_error_roll)
+        if not self.pid_active:
+            return
+
         error_roll = -(self.target_roll - self.current_roll)
         proportional_roll = self.kp_roll * error_roll
         self.integral_error_roll += error_roll * dt
