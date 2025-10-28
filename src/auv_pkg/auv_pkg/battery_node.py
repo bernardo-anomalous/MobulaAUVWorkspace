@@ -89,11 +89,16 @@ def save_state(state: dict) -> None:
 
 # ----------------------------- Pack --------------------------------
 class Pack:
-    def __init__(self, name: str, addr: int, capacity_mAh: float, i2c_bus_id: int, node: Node):
+    WARN_CELL_HIGH = 3.3
+    WARN_CELL_LOW = 3.1
+    CRITICAL_CELL = 3.0
+
+    def __init__(self, name: str, addr: int, capacity_mAh: float, i2c_bus_id: int, series_cells: int, node: Node):
         self.name = name
         self.addr = addr
         self.capacity_mAh = capacity_mAh
         self.node = node
+        self.series_cells = max(1, int(series_cells))
 
         self.present = False
         self.ina: Optional[INA260] = None
@@ -130,6 +135,7 @@ class Pack:
         self.pub_used_Wh      = node.create_publisher(Float32, f"{base}/used_Wh"  , 10)
         self.pub_eta_min      = node.create_publisher(Float32, f"{base}/eta_min"  , 10)  # behavior-based
         self.pub_est_topic    = node.create_publisher(String , f"{base}/behavior_based_estimation", 10)
+        self.pub_voltage_state = node.create_publisher(String, f"{base}/voltage_state", qos_transient)
 
     # --------- I2C bring-up ----------
     def _new_i2c(self):
@@ -266,6 +272,10 @@ class Pack:
                 f"SoC={soc:.1f}% used={self.used_mAh:.0f}mAh/{self.capacity_mAh:.0f}mAh "
                 f"avgP~{avg_p:.2f}W"
             )
+            state_label, state_detail = self._classify_voltage(v_V)
+            self.pub_voltage_state.publish(String(data=state_detail))
+
+            summary.data += f" state={state_label}"
             self.pub_summary.publish(summary)
             return v_V, i_A, p_W, soc
 
@@ -275,6 +285,28 @@ class Pack:
             self.present = False
             self.pub_present.publish(Bool(data=False))
             return None
+
+    def _classify_voltage(self, v_pack: float) -> Tuple[str, str]:
+        cells = max(1, self.series_cells)
+        v_cell = v_pack / cells
+        warn_high_total = cells * self.WARN_CELL_HIGH
+        warn_low_total = cells * self.WARN_CELL_LOW
+        crit_total = cells * self.CRITICAL_CELL
+
+        if v_cell <= self.CRITICAL_CELL:
+            state = "CRITICAL"
+        elif self.WARN_CELL_LOW <= v_cell <= self.WARN_CELL_HIGH:
+            state = "LOW"
+        elif v_cell < self.WARN_CELL_LOW:
+            state = "CRITICAL"
+        else:
+            state = "NOMINAL"
+
+        detail = (
+            f"{self.name}:{state} v_pack={v_pack:.2f}V (~{v_cell:.2f}V/cell) "
+            f"warn~{warn_low_total:.2f}-{warn_high_total:.2f}V crit<=~{crit_total:.2f}V"
+        )
+        return state, detail
 
     def _apply_ocv_baseline(self, v_pack: float) -> None:
         """Align counters to the estimated SoC derived from the present voltage."""
@@ -303,6 +335,8 @@ class BatteryNode(Node):
         self.declare_parameter("actuation_addr", 0x44)  # A1 bridged only
         self.declare_parameter("compute_capacity_mAh", 5300.0)
         self.declare_parameter("actuation_capacity_mAh", 5300.0)
+        self.declare_parameter("compute_series_cells", 3)
+        self.declare_parameter("actuation_series_cells", 3)
         self.declare_parameter("poll_hz", 5.0)
         self.declare_parameter("behavior_window_sec", 300)  # 5 minutes
 
@@ -311,12 +345,14 @@ class BatteryNode(Node):
         act_addr  = int(self.get_parameter("actuation_addr").value)
         comp_cap  = float(self.get_parameter("compute_capacity_mAh").value)
         act_cap   = float(self.get_parameter("actuation_capacity_mAh").value)
+        comp_cells = int(self.get_parameter("compute_series_cells").value)
+        act_cells  = int(self.get_parameter("actuation_series_cells").value)
         poll_hz   = max(0.5, float(self.get_parameter("poll_hz").value))
         self._period = 1.0 / poll_hz
 
         # Packs
-        self.compute = Pack("compute", comp_addr, comp_cap, self._bus_id, self)
-        self.actuation = Pack("actuation", act_addr, act_cap, self._bus_id, self)
+        self.compute = Pack("compute", comp_addr, comp_cap, self._bus_id, comp_cells, self)
+        self.actuation = Pack("actuation", act_addr, act_cap, self._bus_id, act_cells, self)
         self._packs = [self.compute, self.actuation]
 
         # Restore persisted counters (with version guard)
@@ -341,8 +377,9 @@ class BatteryNode(Node):
         self.add_on_set_parameters_callback(self._on_param_update)
 
         self.get_logger().info(
-            f"[BatteryNode] bus={self._bus_id} poll={poll_hz:.1f}Hz | compute@0x{comp_addr:02X}({comp_cap:.0f}mAh) "
-            f"actuation@0x{act_addr:02X}({act_cap:.0f}mAh)"
+            f"[BatteryNode] bus={self._bus_id} poll={poll_hz:.1f}Hz | "
+            f"compute@0x{comp_addr:02X}({comp_cap:.0f}mAh,{comp_cells}S) "
+            f"actuation@0x{act_addr:02X}({act_cap:.0f}mAh,{act_cells}S)"
         )
 
     # --------- timers ----------
@@ -371,6 +408,12 @@ class BatteryNode(Node):
             elif prm.name == "behavior_window_sec" and prm.type_ in (Parameter.Type.INTEGER, Parameter.Type.DOUBLE):
                 val = int(prm.value)
                 self.compute.window_sec = self.actuation.window_sec = max(60, val)
+                changed.append(prm.name)
+            elif prm.name == "compute_series_cells" and prm.type_ in (Parameter.Type.INTEGER, Parameter.Type.DOUBLE):
+                self.compute.series_cells = max(1, int(prm.value))
+                changed.append(prm.name)
+            elif prm.name == "actuation_series_cells" and prm.type_ in (Parameter.Type.INTEGER, Parameter.Type.DOUBLE):
+                self.actuation.series_cells = max(1, int(prm.value))
                 changed.append(prm.name)
         if changed:
             self.get_logger().info(f"[BatteryNode] updated params: {', '.join(changed)}")
