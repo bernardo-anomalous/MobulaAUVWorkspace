@@ -232,8 +232,6 @@ class ServoInterpolationNodeV3(Node):
             if self.timer:
                 self.timer.cancel()
             self.timer = None
-            if was_running:
-                self.publish_end_command()
             self.steps = []
             self.current_step_index = 0
         else:
