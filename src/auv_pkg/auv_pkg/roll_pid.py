@@ -52,8 +52,8 @@ class WingRollController(Node):
         self.local_hold_requested = False
 
         # Roll hold thresholds
-        self.declare_parameter('hold_threshold_deg', 20.0)
-        self.declare_parameter('release_threshold_deg', 10.0)
+        self.declare_parameter('hold_threshold_deg', 6.0)
+        self.declare_parameter('release_threshold_deg', 3.0)
         self.hold_threshold_deg = max(0.0, float(self.get_parameter('hold_threshold_deg').value))
         self.release_threshold_deg = max(0.0, float(self.get_parameter('release_threshold_deg').value))
         if self.release_threshold_deg > self.hold_threshold_deg:
@@ -138,7 +138,8 @@ class WingRollController(Node):
         self._last_published_hold_state = self.hold_active
 
     def update_pid_activation_state(self):
-        new_state = self.pid_enabled and not self.hold_active
+        hold_blocks_pid = self.hold_active and not self.local_hold_requested
+        new_state = self.pid_enabled and not hold_blocks_pid
         if new_state and not self.pid_active:
             # Reset recovery ramp when PID control is re-enabled
             self.recovery_factor = 0.0
