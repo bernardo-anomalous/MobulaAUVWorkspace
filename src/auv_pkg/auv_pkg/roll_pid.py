@@ -52,8 +52,8 @@ class WingRollController(Node):
         self.local_hold_requested = False
 
         # Roll hold thresholds
-        self.declare_parameter('hold_threshold_deg', 20.0)
-        self.declare_parameter('release_threshold_deg', 10.0)
+        self.declare_parameter('hold_threshold_deg', 6.0)
+        self.declare_parameter('release_threshold_deg', 3.0)
         self.hold_threshold_deg = max(0.0, float(self.get_parameter('hold_threshold_deg').value))
         self.release_threshold_deg = max(0.0, float(self.get_parameter('release_threshold_deg').value))
         if self.release_threshold_deg > self.hold_threshold_deg:
