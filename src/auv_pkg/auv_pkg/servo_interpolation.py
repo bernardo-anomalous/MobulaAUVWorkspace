@@ -81,7 +81,10 @@ class ServoInterpolationNodeV3(Node):
             return
 
         if self.hold_active:
-            self.get_logger().info('Hold request active; queuing new servo interpolation without executing until resume.')
+            self.get_logger().warn(
+                'Hold request active; ignoring new servo interpolation command until roll hold is released.'
+            )
+            return
 
         # Cancel any in-progress interpolation so new instructions take effect
         if self.timer is not None:
@@ -223,17 +226,16 @@ class ServoInterpolationNodeV3(Node):
             return
         self.hold_active = msg.hold
         if self.hold_active:
-            self.get_logger().info('Servo interpolation hold requested; pausing command execution.')
+            self.get_logger().info('Servo interpolation hold requested; pausing and clearing queued commands.')
             self.paused = True
             if self.timer:
                 self.timer.cancel()
             self.timer = None
+            self.steps = []
+            self.current_step_index = 0
         else:
-            self.get_logger().info('Servo interpolation hold released; resuming queued command execution.')
-            # Resume the existing interpolation sequence so queued steps complete.
+            self.get_logger().info('Servo interpolation hold released; ready to accept new movement commands.')
             self.paused = False
-            if self.current_step_index < len(self.steps) and self.timer is None:
-                self.timer = self.create_timer(1 / self.update_rate_hz, self.publish_next_step)
         self.publish_hold_state()
 
     def publish_hold_state(self):
