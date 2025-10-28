@@ -210,11 +210,27 @@ class Pack:
             # Behavior-based estimate (moving avg power ➜ ETA)
             with self._avg_lock:
                 self._p_hist.append((t_now, p_W))
-                # drop old
                 cutoff = t_now - self.window_sec
-                while self._p_hist and self._p_hist[0][0] < cutoff:
+                # Drop stale history but retain one point before the cutoff for interpolation
+                while len(self._p_hist) > 1 and self._p_hist[1][0] <= cutoff:
                     self._p_hist.pop(0)
-                avg_p = sum(p for _, p in self._p_hist) / max(1, len(self._p_hist))
+                if self._p_hist and self._p_hist[0][0] < cutoff:
+                    t0, p0 = self._p_hist[0]
+                    self._p_hist[0] = (cutoff, p0)
+
+                if len(self._p_hist) == 1:
+                    avg_p = self._p_hist[0][1]
+                else:
+                    total_dt = 0.0
+                    accum_pw = 0.0
+                    prev_t, prev_p = self._p_hist[0]
+                    for cur_t, cur_p in self._p_hist[1:]:
+                        dt_seg = max(0.0, cur_t - prev_t)
+                        if dt_seg > 0.0:
+                            accum_pw += prev_p * dt_seg
+                            total_dt += dt_seg
+                        prev_t, prev_p = cur_t, cur_p
+                    avg_p = accum_pw / total_dt if total_dt > 0.0 else self._p_hist[-1][1]
             # Remaining Wh estimated from capacity & used_Wh (capacity from mAh ~ Vnom*Ah)
             # Use 3S nominal 11.1V to convert capacity_mAh to Wh baseline:
             pack_Wh_nom = (self.capacity_mAh / 1000.0) * 11.1
@@ -231,14 +247,19 @@ class Pack:
             self.pub_soc.publish(Float32(data=soc))
             self.pub_used_mAh.publish(Float32(data=self.used_mAh))
             self.pub_used_Wh.publish(Float32(data=self.used_Wh))
+            eta_str = "--"
             if math.isfinite(eta_min):
+                eta_str = f"{eta_min:.1f}min"
                 self.pub_eta_min.publish(Float32(data=eta_min))
                 self.pub_est_topic.publish(String(data=f"{self.name}: avgP~{avg_p:.2f}W ETA~{eta_min:.1f}min"))
 
             # Summary (human)
             summary = String()
-            summary.data = (f"{self.name}: V={v_V:.2f}V I={i_A:.3f}A P~{p_W:.2f}W "
-                            f"SoC={soc:.1f}% used={self.used_mAh:.0f}mAh/{self.capacity_mAh:.0f}mAh")
+            summary.data = (
+                f"{self.name}: V={v_V:.2f}V I={i_A:.3f}A P~{p_W:.2f}W "
+                f"SoC={soc:.1f}% used={self.used_mAh:.0f}mAh/{self.capacity_mAh:.0f}mAh "
+                f"avgP~{avg_p:.2f}W ETA={eta_str}"
+            )
             self.pub_summary.publish(summary)
             return v_V, i_A, p_W, soc
 
