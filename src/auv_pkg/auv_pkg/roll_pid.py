@@ -186,18 +186,6 @@ class WingRollController(Node):
             self._set_hold_state_from_local(False, error_deg)
 
     def update_pid(self):
-        pid_engaged = self.pid_active or self.local_hold_requested
-
-        if not pid_engaged:
-            if self.last_pid_active_state:
-                self.get_logger().info("Wing PID controllers deactivated.")
-                self.last_pid_active_state = False
-            return
-
-        if not self.last_pid_active_state:
-            self.get_logger().info("Wing PID controllers activated.")
-            self.last_pid_active_state = True
-
         now = self.get_clock().now()
         time_since_last_imu = (now.nanoseconds - self.last_imu_time.nanoseconds) / 1e9
 
@@ -226,8 +214,18 @@ class WingRollController(Node):
         absolute_error_roll = abs(self.target_roll - self.current_roll)
         self.last_roll_error_deg = absolute_error_roll
         self._evaluate_hold_thresholds(absolute_error_roll)
-        if not (self.pid_active or self.local_hold_requested):
+
+        pid_engaged = self.pid_active or self.local_hold_requested
+
+        if not pid_engaged:
+            if self.last_pid_active_state:
+                self.get_logger().info("Wing PID controllers deactivated.")
+                self.last_pid_active_state = False
             return
+
+        if not self.last_pid_active_state:
+            self.get_logger().info("Wing PID controllers activated.")
+            self.last_pid_active_state = True
 
         error_roll = -(self.target_roll - self.current_roll)
         proportional_roll = self.kp_roll * error_roll
