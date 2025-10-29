@@ -302,10 +302,26 @@ class ServoDriverNode(LifecycleNode):
             # update servos 1 and 3 while the hold is active.
             self.executing_movement = False
             self.current_movement_type = ''
+            self._freeze_targets_at_current_positions()
 
         # Republishes the most recent status with updated hold context for visibility.
         if self._last_base_status_message is not None:
             self._publish_busy_status(self._last_base_status_message, force=True)
+
+    def _freeze_targets_at_current_positions(self) -> None:
+        """Pin the non-PID servos at their current angles when a hold begins."""
+        with self.target_lock:
+            if not self.last_target_angles:
+                return
+
+            # Ensure the internal angle tracking reflects the current pose so the
+            # refresh loop immediately stops any in-flight interpolation.
+            for idx, angle in enumerate(self.current_angles):
+                if idx < len(self.last_target_angles):
+                    self.last_target_angles[idx] = angle
+
+        # Share the frozen pose with other nodes for consistency.
+        self._publish_current_servo_angles()
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Activating Servo Driver Node...')
