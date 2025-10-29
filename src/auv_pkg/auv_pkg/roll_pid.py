@@ -58,9 +58,8 @@ class WingRollController(Node):
         self.release_threshold_deg = max(0.0, float(self.get_parameter('release_threshold_deg').value))
         if self.release_threshold_deg > self.hold_threshold_deg:
             self.get_logger().warn(
-                'release_threshold_deg (%.2f°) exceeds hold_threshold_deg (%.2f°); clamping release threshold.',
-                self.release_threshold_deg,
-                self.hold_threshold_deg,
+                f"release_threshold_deg ({self.release_threshold_deg:.2f}°) exceeds hold_threshold_deg "
+                f"({self.hold_threshold_deg:.2f}°); clamping release threshold."
             )
             self.release_threshold_deg = self.hold_threshold_deg
 
@@ -155,9 +154,7 @@ class WingRollController(Node):
                 return
             if error_deg is not None:
                 self.get_logger().info(
-                    'Roll error %.2f° exceeded %.2f°; requesting wing hold.',
-                    error_deg,
-                    self.hold_threshold_deg,
+                    f"Roll error {error_deg:.2f}° exceeded {self.hold_threshold_deg:.2f}°; requesting wing hold."
                 )
             else:
                 self.get_logger().info('Roll error exceeded hold threshold; requesting wing hold.')
@@ -173,9 +170,7 @@ class WingRollController(Node):
         if self.hold_active:
             if error_deg is not None:
                 self.get_logger().info(
-                    'Roll error %.2f° dropped below %.2f°; releasing wing hold.',
-                    error_deg,
-                    self.release_threshold_deg,
+                    f"Roll error {error_deg:.2f}° dropped below {self.release_threshold_deg:.2f}°; releasing wing hold."
                 )
             else:
                 self.get_logger().info('Roll error dropped below release threshold; releasing wing hold.')
