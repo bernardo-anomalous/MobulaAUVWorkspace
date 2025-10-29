@@ -234,6 +234,9 @@ class ServoInterpolationNodeV3(Node):
             self.timer = None
             self.steps = []
             self.current_step_index = 0
+            if was_running:
+                self.publish_end_command()
+                was_running = False
         else:
             self.get_logger().info('Servo interpolation hold released; ready to accept new movement commands.')
             self.paused = False
