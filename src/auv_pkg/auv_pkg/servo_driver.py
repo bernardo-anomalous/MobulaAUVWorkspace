@@ -289,11 +289,20 @@ class ServoDriverNode(LifecycleNode):
 
 
     def _hold_state_callback(self, msg: HoldRequest):
+        previous_hold_state = self.hold_active
         self.hold_active = bool(msg.hold)
         if self.debug_logging:
             self.get_logger().info(
                 f"Received wing hold state update: {'active' if self.hold_active else 'released'}"
             )
+
+        if self.hold_active and not previous_hold_state:
+            # Clear any notion of an in-flight canned routine so the roll PID can
+            # immediately assume control of the wings. The PID will continue to
+            # update servos 1 and 3 while the hold is active.
+            self.executing_movement = False
+            self.current_movement_type = ''
+
         # Republishes the most recent status with updated hold context for visibility.
         if self._last_base_status_message is not None:
             self._publish_busy_status(self._last_base_status_message, force=True)
@@ -336,19 +345,33 @@ class ServoDriverNode(LifecycleNode):
             self.get_logger().info(f'Received command: {msg}')
 
         try:
-            movement_type = msg.movement_type.lower() if msg.movement_type else ""
+            movement_type_raw = msg.movement_type or ""
+            movement_type = movement_type_raw.lower()
+            is_pid_control = 'pid_control' in movement_type
+            is_end_message = 'end' in movement_type
 
-            if 'end' in movement_type:
+            if is_end_message:
                 self.executing_movement = False
                 self.current_movement_type = ''
                 self._publish_busy_status("nominal: roll and pitch pid engaged")
-            elif movement_type != 'pid_control':
+            elif is_pid_control:
+                if not self.executing_movement:
+                    self._publish_busy_status("nominal: roll and pitch pid engaged")
+            else:
                 self.executing_movement = True
                 self.current_movement_type = movement_type
                 self._publish_busy_status(f"busy: executing {msg.movement_type}")
-            else:
-                if not self.executing_movement:
-                    self._publish_busy_status("nominal: roll and pitch pid engaged")
+
+            if self.hold_active and not is_pid_control:
+                # Drop any queued interpolation instructions while the roll PID
+                # is responsible for the wings. This prevents commands buffered
+                # before the hold from continuing to run on the hardware.
+                if self.debug_logging:
+                    self.get_logger().info(
+                        "Wing hold active; ignoring non-PID command with movement_type=%s",
+                        movement_type_raw or 'unknown',
+                    )
+                return
 
             # === NORMAL SERVO EXECUTION ===
             with self.target_lock:
