@@ -117,7 +117,7 @@ class IMUNode(Node):
 
         # ---- parameters ------------------------------------------------------
         # where the IMU lives now
-        self.declare_parameter('i2c_bus_id', 0)   # you moved IMU to bus 0
+        self.declare_parameter('i2c_bus_id', 3)   # you moved IMU to bus 0
         self.declare_parameter('i2c_address', 0x4B)
         self.bus_id = int(self.get_parameter('i2c_bus_id').value)
         self.addr = int(self.get_parameter('i2c_address').value)
