@@ -13,11 +13,12 @@ find_package(builtin_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/ServoMovementCommand.msg"
   "msg/HoldRequest.msg"
+  "msg/ServoMovementCommand.msg"
+  "msg/SystemHealth.msg"
   DEPENDENCIES builtin_interfaces std_msgs
 )
 
-
+ament_export_dependencies(rosidl_default_runtime)
 
 ament_package()
