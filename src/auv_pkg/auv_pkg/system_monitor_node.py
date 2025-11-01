@@ -153,10 +153,12 @@ class SystemMonitorNode(Node):
         if self.include_prev_boot:
             self._analyze_previous_boot()
         else:
+            self.previous_shutdown_reason = 'nominal (analysis disabled)'
             try:
                 self.prev_shutdown_pub.publish(String(data=self.previous_shutdown_message))
             except Exception:
                 pass
+            self._log_previous_shutdown_summary()
 
         self.fast_timer = self.create_timer(self.fast_poll_sec, self._fast_timer_cb)
         self.slow_timer = self.create_timer(self.slow_poll_sec, self._slow_timer_cb)
@@ -332,6 +334,17 @@ class SystemMonitorNode(Node):
             self.active_warnings.add(message)
             self.append_log_entry(f'⚠ {message}')
 
+    def _log_previous_shutdown_summary(self) -> None:
+        message = self.previous_shutdown_message
+        if not message:
+            return
+
+        reason = (self.previous_shutdown_reason or '').lower()
+        if 'nominal' in reason and '⚠' not in message:
+            self.get_logger().info(f'Previous shutdown findings: {message}')
+        else:
+            self.get_logger().warn(f'Previous shutdown findings: {message}')
+
     def _analyze_previous_boot(self) -> None:
         issues: List[str] = []
         log_lines: List[str] = []
@@ -387,6 +400,8 @@ class SystemMonitorNode(Node):
             self.prev_shutdown_pub.publish(String(data=status_message))
         except Exception:
             pass
+
+        self._log_previous_shutdown_summary()
 
         previous_log = self.log_dir / 'previous_boot.log'
         try:
