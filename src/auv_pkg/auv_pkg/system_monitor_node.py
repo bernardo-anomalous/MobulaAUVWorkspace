@@ -38,6 +38,10 @@ class SystemMonitorNode(Node):
     def __init__(self) -> None:
         super().__init__('system_monitor_node')
 
+        self.startup_progress: List[Dict[str, str]] = []
+        self.startup_warnings: List[str] = []
+        self.startup_errors: List[str] = []
+
         self.fast_poll_sec = self.declare_parameter('fast_poll_sec', 1.0).value
         self.slow_poll_sec = self.declare_parameter('slow_poll_sec', 10.0).value
         self.event_window_sec = self.declare_parameter('event_window_sec', 300.0).value
@@ -51,7 +55,20 @@ class SystemMonitorNode(Node):
         self.default_swap_total_mb = float(self.declare_parameter('default_swap_total_mb', 2048.0).value)
         self.default_disk_total_gb = float(self.declare_parameter('default_disk_total_gb', 64.0).value)
 
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.session_start_ts = _datetime.datetime.now()
+        self.session_log_entries: List[str] = []
+        self.active_warnings: set[str] = set()
+
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
+            self._record_startup_event(
+                'log_directory',
+                f'Failed to prepare log directory {self.log_dir}: {exc}',
+                severity='error',
+            )
+        else:
+            self._record_startup_event('log_directory', f'Log directory ready at {self.log_dir}')
 
         qos_persistent = QoSProfile(
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
@@ -63,10 +80,7 @@ class SystemMonitorNode(Node):
         self.health_pub = self.create_publisher(SystemHealth, '/system/health', 10)
         self.events_pub = self.create_publisher(String, self.events_topic, 10)
         self.prev_shutdown_pub = self.create_publisher(String, '/system/previous_shutdown', qos_profile=qos_persistent)
-
-        self.session_start_ts = _datetime.datetime.now()
-        self.session_log_entries: List[str] = []
-        self.active_warnings: set[str] = set()
+        self._record_startup_event('publishers', 'Publishers initialised')
         neg_inf = float('-inf')
         self.last_trigger_times: Dict[str, float] = {
             'undervoltage': neg_inf,
@@ -111,8 +125,11 @@ class SystemMonitorNode(Node):
             'kernel_version': self._read_kernel_version(),
             'firmware_version': self._read_firmware_version(),
             'last_boot_reason': 'unknown',
-            'startup_status': 'running',
+            'startup_status': 'initialising',
+            'startup_progress': self.startup_progress,
         }
+
+        self._record_startup_event('initialisation', 'System monitor node initialising')
 
         self.previous_shutdown_message = 'previous_shutdown: NOMINAL'
         self.previous_shutdown_reason = 'unknown'
@@ -144,6 +161,9 @@ class SystemMonitorNode(Node):
         self._prev_net_sample: Optional[Tuple[str, float, int, int]] = None
         self.shutdown_initiated = False
 
+        self._record_startup_event('parameters', 'Startup parameters initialised')
+        self._verify_optional_dependencies()
+
         if psutil is not None:
             try:
                 psutil.cpu_percent(interval=None)
@@ -151,8 +171,19 @@ class SystemMonitorNode(Node):
                 pass
 
         if self.include_prev_boot:
-            self._analyze_previous_boot()
+            self._record_startup_event('previous_boot_analysis', 'Analysing previous boot information')
+            try:
+                self._analyze_previous_boot()
+            except Exception as exc:
+                self._record_startup_event(
+                    'previous_boot_analysis',
+                    f'Previous boot analysis failed: {exc}',
+                    severity='error',
+                )
+            else:
+                self._record_startup_event('previous_boot_analysis', 'Previous boot analysis complete')
         else:
+            self._record_startup_event('previous_boot_analysis', 'Previous boot analysis disabled via parameter')
             self.previous_shutdown_reason = 'nominal (analysis disabled)'
             try:
                 self.prev_shutdown_pub.publish(String(data=self.previous_shutdown_message))
@@ -160,10 +191,23 @@ class SystemMonitorNode(Node):
                 pass
             self._log_previous_shutdown_summary()
 
-        self.fast_timer = self.create_timer(self.fast_poll_sec, self._fast_timer_cb)
-        self.slow_timer = self.create_timer(self.slow_poll_sec, self._slow_timer_cb)
+        try:
+            self.fast_timer = self.create_timer(self.fast_poll_sec, self._fast_timer_cb)
+            self.slow_timer = self.create_timer(self.slow_poll_sec, self._slow_timer_cb)
+        except Exception as exc:
+            self._record_startup_event('timers', f'Failed to create timers: {exc}', severity='error')
+            raise
+        else:
+            self._record_startup_event('timers', 'Fast and slow timers initialised')
 
-        signal.signal(signal.SIGINT, self._handle_sigint)
+        try:
+            signal.signal(signal.SIGINT, self._handle_sigint)
+        except Exception as exc:
+            self._record_startup_event('signal_handlers', f'Failed to register SIGINT handler: {exc}', severity='warn')
+        else:
+            self._record_startup_event('signal_handlers', 'Signal handlers registered')
+
+        self._finalise_startup()
 
     # ------------------------------------------------------------------
     # Helper methods for system information
@@ -333,6 +377,90 @@ class SystemMonitorNode(Node):
                 pass
             self.active_warnings.add(message)
             self.append_log_entry(f'⚠ {message}')
+
+    def _record_startup_event(self, task: str, message: str, severity: str = 'info') -> None:
+        severity_normalised = severity.lower()
+        timestamp = _datetime.datetime.now().isoformat()
+        event = {
+            'timestamp': timestamp,
+            'task': task,
+            'severity': severity_normalised,
+            'message': message,
+        }
+        self.startup_progress.append(event)
+
+        symbol_map = {'info': 'ℹ', 'warn': '⚠', 'error': '✖'}
+        symbol = symbol_map.get(severity_normalised, 'ℹ')
+
+        has_cached_metrics = hasattr(self, 'cached_metrics')
+
+        if severity_normalised == 'error':
+            self.startup_errors.append(message)
+            logger = self.get_logger().error
+            if has_cached_metrics:
+                self.cached_metrics['startup_status'] = 'error'
+        elif severity_normalised == 'warn':
+            self.startup_warnings.append(message)
+            logger = self.get_logger().warn
+            if has_cached_metrics and self.cached_metrics.get('startup_status') != 'error':
+                self.cached_metrics['startup_status'] = 'degraded'
+        else:
+            logger = self.get_logger().info
+
+        logger(f'Startup [{task}] - {message}')
+        self.append_log_entry(f'{symbol} Startup[{task}]: {message}')
+
+        if severity_normalised in ('warn', 'error') and hasattr(self, 'events_pub'):
+            try:
+                level = 'WARNING' if severity_normalised == 'warn' else 'ERROR'
+                self.events_pub.publish(String(data=f'Startup {level}: {task} - {message}'))
+            except Exception:
+                pass
+
+    def _verify_optional_dependencies(self) -> None:
+        if psutil is None:
+            self._record_startup_event(
+                'dependency:psutil',
+                'Python module psutil not available; CPU, memory, and network statistics limited.',
+                severity='warn',
+            )
+        else:
+            self._record_startup_event('dependency:psutil', 'psutil module available')
+
+        if shutil.which('vcgencmd') is None:
+            self._record_startup_event(
+                'dependency:vcgencmd',
+                'vcgencmd command not found; Raspberry Pi power telemetry limited.',
+                severity='warn',
+            )
+        else:
+            self._record_startup_event('dependency:vcgencmd', 'vcgencmd command available')
+
+        if shutil.which('journalctl') is None:
+            self._record_startup_event(
+                'dependency:journalctl',
+                'journalctl command not found; previous boot analysis may be incomplete.',
+                severity='warn',
+            )
+        else:
+            self._record_startup_event('dependency:journalctl', 'journalctl command available')
+
+    def _finalise_startup(self) -> None:
+        if self.startup_errors:
+            self.cached_metrics['startup_status'] = 'error'
+            message = 'Startup completed with errors; system monitor running in degraded mode.'
+            self._record_startup_event('startup_complete', message, severity='error')
+        elif self.startup_warnings:
+            if self.cached_metrics.get('startup_status') != 'error':
+                self.cached_metrics['startup_status'] = 'degraded'
+            message = 'Startup completed with warnings; check logs for reduced functionality details.'
+            self._record_startup_event('startup_complete', message, severity='warn')
+        else:
+            self.cached_metrics['startup_status'] = 'ready'
+            message = 'Startup completed successfully; system monitor operational.'
+            self._record_startup_event('startup_complete', message, severity='info')
+
+        self.latest_fast_metrics['status_summary'] = message
 
     def _log_previous_shutdown_summary(self) -> None:
         message = self.previous_shutdown_message
