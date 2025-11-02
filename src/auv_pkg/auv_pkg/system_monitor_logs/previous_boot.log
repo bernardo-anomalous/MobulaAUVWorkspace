@@ -1,434 +1,468 @@
-Previous boot analysis generated 2025-11-02T11:48:37.785172
-Status: previous_shutdown: UNEXPECTED_POWER_LOSS | System journal indicates unclean shutdown (possible power loss); Normal shutdown markers missing from journal
+Previous boot analysis generated 2025-11-02T12:56:48.207530
+Status: previous_shutdown: NOMINAL
 --- journalctl excerpts ---
-Jul 02 21:05:53 mobula kernel: pci_bus 0000:01: supply vpcie3v3 not found, using dummy regulator
-Jul 02 21:05:53 mobula kernel: pci_bus 0000:01: supply vpcie3v3aux not found, using dummy regulator
-Jul 02 21:05:53 mobula kernel: pci_bus 0000:01: supply vpcie12v not found, using dummy regulator
-Jul 02 21:05:53 mobula kernel: dwc2 fe980000.usb: supply vusb_d not found, using dummy regulator
-Jul 02 21:05:53 mobula kernel: dwc2 fe980000.usb: supply vusb_a not found, using dummy regulator
-Jul 02 21:05:53 mobula systemd[1]: Configuration file /run/systemd/system/netplan-ovs-cleanup.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
-Jul 02 21:05:53 mobula systemd[1]: Configuration file /etc/systemd/system/mediamtx.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
-Jul 02 21:05:53 mobula kernel: device-mapper: core: CONFIG_IMA_DISABLE_HTABLE is disabled. Duplicate IMA measurements will not be recorded in the IMA log.
-Jul 02 21:05:54 mobula systemd-journald[397]: File /var/log/journal/b56bdb9fa798498294266b5a2d872e03/system.journal corrupted or uncleanly shut down, renaming and replacing.
-Jul 02 21:05:55 mobula (udev-worker)[520]: mmcblk0: Process '/usr/bin/unshare -m /usr/bin/snap auto-import --mount=/dev/mmcblk0' failed with exit code 1.
-Jul 02 21:05:55 mobula (udev-worker)[512]: mmcblk0p2: Process '/usr/bin/unshare -m /usr/bin/snap auto-import --mount=/dev/mmcblk0p2' failed with exit code 1.
-Jul 02 21:05:55 mobula (udev-worker)[520]: mmcblk0p1: Process '/usr/bin/unshare -m /usr/bin/snap auto-import --mount=/dev/mmcblk0p1' failed with exit code 1.
-Jul 02 21:05:55 mobula kernel: vc_sm_cma: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: bcm2835_mmal_vchiq: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: bcm2835_isp: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: bcm2835_v4l2: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: bcm2835_codec: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: rpivid_hevc: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: snd_bcm2835: module is from the staging directory, the quality is unknown, you have been warned.
-Jul 02 21:05:56 mobula kernel: hci_uart_bcm serial0-0: supply vbat not found, using dummy regulator
-Jul 02 21:05:56 mobula kernel: hci_uart_bcm serial0-0: supply vddio not found, using dummy regulator
-Jul 02 21:05:56 mobula kernel: rcu: INFO: rcu_preempt detected expedited stalls on CPUs/tasks: { P499 } 21 jiffies s: 237 root: 0x0/T
-Jul 02 21:05:56 mobula kernel: rcu: blocking rcu_node structures (internal RCU debug):
-Nov 01 17:10:21 mobula systemd-journald[397]: Failed to read journal file /var/log/journal/b56bdb9fa798498294266b5a2d872e03/user-1002.journal for rotation, trying to move it out of the way: Device or resource busy
-Nov 01 17:10:23 mobula (uetoothd)[1008]: bluetooth.service: ConfigurationDirectory 'bluetooth' already exists but the mode is different. (File system: 755 ConfigurationDirectoryMode: 555)
-Nov 01 17:10:23 mobula (sessiond)[1013]: lttng-sessiond.service: Referenced but unset environment variable evaluates to an empty string: DAEMON_ARGS
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-nss.socket - SSSD NSS Service responder socket.
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-autofs.socket - SSSD AutoFS Service responder socket.
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-pac.socket - SSSD PAC Service responder socket.
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-pam-priv.socket - SSSD PAM Service responder private socket.
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-pam.socket - SSSD PAM Service responder socket.
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-ssh.socket - SSSD SSH Service responder socket.
-Nov 01 17:10:23 mobula systemd[1]: Dependency failed for sssd-sudo.socket - SSSD Sudo Service responder socket.
-Nov 01 17:10:23 mobula (cron)[1030]: cron.service: Referenced but unset environment variable evaluates to an empty string: EXTRA_OPTS
-Nov 01 17:10:24 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
-Nov 01 17:10:24 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
-Nov 01 17:10:24 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
-Nov 01 17:10:25 mobula bluetoothd[1008]: src/plugin.c:plugin_init() System does not support csip plugin
-Nov 01 17:10:25 mobula bluetoothd[1008]: profiles/audio/micp.c:micp_init() D-Bus experimental not enabled
-Nov 01 17:10:25 mobula bluetoothd[1008]: src/plugin.c:plugin_init() System does not support micp plugin
-Nov 01 17:10:25 mobula bluetoothd[1008]: src/plugin.c:plugin_init() System does not support vcp plugin
-Nov 01 17:10:25 mobula bluetoothd[1008]: src/plugin.c:plugin_init() System does not support mcp plugin
-Nov 01 17:10:25 mobula bluetoothd[1008]: src/plugin.c:plugin_init() System does not support bass plugin
-Nov 01 17:10:25 mobula bluetoothd[1008]: src/plugin.c:plugin_init() System does not support bap plugin
-Nov 01 17:10:25 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
-Nov 01 17:10:25 mobula gnome-remote-de[1012]: Init TPM credentials failed because No TPM device found, using GKeyFile as fallback
-Nov 01 17:10:25 mobula bluetoothd[1008]: profiles/sap/server.c:sap_server_register() Sap driver initialization failed.
-Nov 01 17:10:25 mobula bluetoothd[1008]: sap-server: Operation not permitted (1)
-Nov 01 17:10:25 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
-Nov 01 17:10:25 mobula systemd[1]: pd-mapper.service: Start request repeated too quickly.
-Nov 01 17:10:25 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
-Nov 01 17:10:25 mobula systemd[1]: Failed to start pd-mapper.service - Qualcomm PD mapper service.
-Nov 01 17:10:28 mobula systemd[1]: Configuration file /run/systemd/system/netplan-ovs-cleanup.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
-Nov 01 17:10:28 mobula systemd[1]: Configuration file /etc/systemd/system/mediamtx.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
-Nov 01 17:10:30 mobula systemd[1]: Cannot find unit for notify message of PID 1311, ignoring.
-Nov 01 17:10:30 mobula systemd[1]: Cannot find unit for notify message of PID 1312, ignoring.
-Nov 01 17:10:30 mobula systemd[1]: Cannot find unit for notify message of PID 1344, ignoring.
-Nov 01 17:10:30 mobula systemd[1]: Cannot find unit for notify message of PID 1345, ignoring.
-Nov 01 17:10:30 mobula kernel: kauditd_printk_skb: 155 callbacks suppressed
-Nov 01 17:10:31 mobula gdm-autologin][1412]: gkr-pam: no password is available for user
-Nov 01 17:10:33 mobula xrdp[1397]: [ERROR] g_tcp_bind(11, 3389) failed bind IPv6 (errno=98) and IPv4 (errno=22).
-Nov 01 17:10:33 mobula xrdp[1397]: [ERROR] trans_listen_address failed
-Nov 01 17:10:33 mobula xrdp[1397]: [ERROR] xrdp_listen_main_loop: xrdp_listen_get_port failed
-Nov 01 17:10:33 mobula systemd[1]: xrdp.service: Failed with result 'exit-code'.
-Nov 01 17:10:33 mobula systemd[1]: xrdp-sesman.service: Failed with result 'exit-code'.
-Nov 01 17:10:34 mobula gdm-autologin][1412]: gkr-pam: couldn't unlock the login keyring.
-Nov 01 17:10:34 mobula pipewire[1450]: mod.jackdbus-detect: Failed to receive jackdbus reply: org.freedesktop.DBus.Error.ServiceUnknown: The name org.jackaudio.service was not provided by any .service files
-Nov 01 17:10:34 mobula wireplumber[1454]: Failed to get percentage from UPower: org.freedesktop.DBus.Error.NameHasNoOwner
-Nov 01 17:10:35 mobula wireplumber[1454]: <WpPortalPermissionStorePlugin:0xaaaac5f9aa40> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
-Nov 01 17:10:35 mobula wireplumber[1454]: <WpPortalPermissionStorePlugin:0xaaaac5f9aa40> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
-Nov 01 17:10:35 mobula wireplumber[1454]: <WpPortalPermissionStorePlugin:0xaaaac5f9aa40> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
-Nov 01 17:10:35 mobula wireplumber[1454]: <WpPortalPermissionStorePlugin:0xaaaac5f9aa40> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
-Nov 01 17:10:35 mobula wireplumber[1454]: <WpPortalPermissionStorePlugin:0xaaaac5f9aa40> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
-Nov 01 17:10:35 mobula gnome-keyring-daemon[1637]: discover_other_daemon: 1
-Nov 01 17:10:35 mobula gnome-keyring-daemon[1638]: discover_other_daemon: 1
-Nov 01 17:10:35 mobula gnome-keyring-daemon[1642]: discover_other_daemon: 1
-Nov 01 17:10:35 mobula systemd[1435]: app-gnome-gnome\x2dkeyring\x2dpkcs11-1636.scope: Failed to add PIDs to scope's control group: No such process
-Nov 01 17:10:35 mobula systemd[1435]: app-gnome-gnome\x2dkeyring\x2dpkcs11-1636.scope: Failed with result 'resources'.
-Nov 01 17:10:35 mobula systemd[1435]: Failed to start app-gnome-gnome\x2dkeyring\x2dpkcs11-1636.scope - Application launched by gnome-session-binary.
-Nov 01 17:10:35 mobula systemd[1435]: app-gnome-gnome\x2dkeyring\x2dsecrets-1628.scope: No PIDs left to attach to the scope's control group, refusing.
-Nov 01 17:10:35 mobula systemd[1435]: app-gnome-gnome\x2dkeyring\x2dsecrets-1628.scope: Failed with result 'resources'.
-Nov 01 17:10:35 mobula systemd[1435]: Failed to start app-gnome-gnome\x2dkeyring\x2dsecrets-1628.scope - Application launched by gnome-session-binary.
-Nov 01 17:10:35 mobula systemd[1435]: app-gnome-gnome\x2dkeyring\x2dssh-1631.scope: No PIDs left to attach to the scope's control group, refusing.
-Nov 01 17:10:35 mobula systemd[1435]: app-gnome-gnome\x2dkeyring\x2dssh-1631.scope: Failed with result 'resources'.
-Nov 01 17:10:35 mobula systemd[1435]: Failed to start app-gnome-gnome\x2dkeyring\x2dssh-1631.scope - Application launched by gnome-session-binary.
-Nov 01 17:10:36 mobula gnome-session-binary[1614]: GnomeDesktop-WARNING: Could not create transient scope for PID 1645: GDBus.Error:org.freedesktop.DBus.Error.UnixProcessIdUnknown: Failed to set unit properties: No such process
-Nov 01 17:10:37 mobula systemd[1]: kerneloops.service: Found left-over process 1701 (kerneloops) in control group while starting unit. Ignoring.
-Nov 01 17:10:37 mobula systemd[1]: kerneloops.service: This usually indicates unclean termination of a previous run, or service implementation deficiencies.
-Nov 01 17:10:37 mobula (rneloops)[1703]: kerneloops.service: Referenced but unset environment variable evaluates to an empty string: DAEMON_ARGS
-Nov 01 17:10:41 mobula gnome-shell[1649]: g_close(fd:0) failed with EBADF. The tracking of file descriptors got messed up
-Nov 01 17:10:41 mobula gnome-shell[1649]: Failed to open gpu '/dev/dri/card0': No suitable mode setting backend found
-Nov 01 17:10:45 mobula systemd[1435]: Dependency failed for org.gnome.SettingsDaemon.XSettings.service - GNOME XSettings service.
-Nov 01 17:10:46 mobula gnome-shell[1649]: Gio.UnixInputStream has been moved to a separate platform-specific library. Please update your code to use GioUnix.InputStream instead.
+Jul 02 21:05:57 mobula kernel: pci_bus 0000:01: supply vpcie3v3 not found, using dummy regulator
+Jul 02 21:05:57 mobula kernel: pci_bus 0000:01: supply vpcie3v3aux not found, using dummy regulator
+Jul 02 21:05:57 mobula kernel: pci_bus 0000:01: supply vpcie12v not found, using dummy regulator
+Jul 02 21:05:57 mobula kernel: dwc2 fe980000.usb: supply vusb_d not found, using dummy regulator
+Jul 02 21:05:57 mobula kernel: dwc2 fe980000.usb: supply vusb_a not found, using dummy regulator
+Jul 02 21:05:57 mobula systemd[1]: Configuration file /run/systemd/system/netplan-ovs-cleanup.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
+Jul 02 21:05:57 mobula systemd[1]: Configuration file /etc/systemd/system/mediamtx.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
+Jul 02 21:05:57 mobula kernel: device-mapper: core: CONFIG_IMA_DISABLE_HTABLE is disabled. Duplicate IMA measurements will not be recorded in the IMA log.
+Jul 02 21:05:57 mobula systemd-journald[393]: File /var/log/journal/b56bdb9fa798498294266b5a2d872e03/system.journal corrupted or uncleanly shut down, renaming and replacing.
+Jul 02 21:05:59 mobula (udev-worker)[506]: mmcblk0: Process '/usr/bin/unshare -m /usr/bin/snap auto-import --mount=/dev/mmcblk0' failed with exit code 1.
+Jul 02 21:05:59 mobula (udev-worker)[496]: mmcblk0p2: Process '/usr/bin/unshare -m /usr/bin/snap auto-import --mount=/dev/mmcblk0p2' failed with exit code 1.
+Jul 02 21:05:59 mobula (udev-worker)[506]: mmcblk0p1: Process '/usr/bin/unshare -m /usr/bin/snap auto-import --mount=/dev/mmcblk0p1' failed with exit code 1.
+Jul 02 21:05:59 mobula kernel: vc_sm_cma: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:05:59 mobula kernel: snd_bcm2835: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:05:59 mobula kernel: bcm2835_mmal_vchiq: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:06:00 mobula kernel: rpivid_hevc: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:06:00 mobula kernel: bcm2835_codec: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:06:00 mobula kernel: bcm2835_v4l2: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:06:00 mobula kernel: bcm2835_isp: module is from the staging directory, the quality is unknown, you have been warned.
+Jul 02 21:06:00 mobula kernel: hci_uart_bcm serial0-0: supply vbat not found, using dummy regulator
+Jul 02 21:06:00 mobula kernel: hci_uart_bcm serial0-0: supply vddio not found, using dummy regulator
+Nov 01 20:03:40 mobula (uetoothd)[990]: bluetooth.service: ConfigurationDirectory 'bluetooth' already exists but the mode is different. (File system: 755 ConfigurationDirectoryMode: 555)
+Nov 01 20:03:40 mobula (sessiond)[995]: lttng-sessiond.service: Referenced but unset environment variable evaluates to an empty string: DAEMON_ARGS
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-nss.socket - SSSD NSS Service responder socket.
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-autofs.socket - SSSD AutoFS Service responder socket.
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-pac.socket - SSSD PAC Service responder socket.
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-pam-priv.socket - SSSD PAM Service responder private socket.
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-pam.socket - SSSD PAM Service responder socket.
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-ssh.socket - SSSD SSH Service responder socket.
+Nov 01 20:03:40 mobula systemd[1]: Dependency failed for sssd-sudo.socket - SSSD Sudo Service responder socket.
+Nov 01 20:03:41 mobula (cron)[1008]: cron.service: Referenced but unset environment variable evaluates to an empty string: EXTRA_OPTS
+Nov 01 20:03:41 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
+Nov 01 20:03:41 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
+Nov 01 20:03:42 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
+Nov 01 20:03:42 mobula bluetoothd[990]: src/plugin.c:plugin_init() System does not support csip plugin
+Nov 01 20:03:42 mobula bluetoothd[990]: profiles/audio/micp.c:micp_init() D-Bus experimental not enabled
+Nov 01 20:03:42 mobula bluetoothd[990]: src/plugin.c:plugin_init() System does not support micp plugin
+Nov 01 20:03:42 mobula bluetoothd[990]: src/plugin.c:plugin_init() System does not support vcp plugin
+Nov 01 20:03:42 mobula bluetoothd[990]: src/plugin.c:plugin_init() System does not support mcp plugin
+Nov 01 20:03:42 mobula bluetoothd[990]: src/plugin.c:plugin_init() System does not support bass plugin
+Nov 01 20:03:42 mobula bluetoothd[990]: src/plugin.c:plugin_init() System does not support bap plugin
+Nov 01 20:03:42 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
+Nov 01 20:03:42 mobula gnome-remote-de[994]: Init TPM credentials failed because No TPM device found, using GKeyFile as fallback
+Nov 01 20:03:42 mobula bluetoothd[990]: profiles/sap/server.c:sap_server_register() Sap driver initialization failed.
+Nov 01 20:03:42 mobula bluetoothd[990]: sap-server: Operation not permitted (1)
+Nov 01 20:03:42 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
+Nov 01 20:03:43 mobula systemd[1]: pd-mapper.service: Start request repeated too quickly.
+Nov 01 20:03:43 mobula systemd[1]: pd-mapper.service: Failed with result 'exit-code'.
+Nov 01 20:03:43 mobula systemd[1]: Failed to start pd-mapper.service - Qualcomm PD mapper service.
+Nov 01 20:03:46 mobula systemd[1]: Configuration file /run/systemd/system/netplan-ovs-cleanup.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
+Nov 01 20:03:46 mobula systemd[1]: Configuration file /etc/systemd/system/mediamtx.service is marked world-inaccessible. This has no effect as configuration data is accessible via APIs without restrictions. Proceeding anyway.
+Nov 01 20:03:47 mobula systemd[1]: Cannot find unit for notify message of PID 1293, ignoring.
+Nov 01 20:03:47 mobula systemd[1]: Cannot find unit for notify message of PID 1294, ignoring.
+Nov 01 20:03:47 mobula systemd[1]: Cannot find unit for notify message of PID 1325, ignoring.
+Nov 01 20:03:47 mobula systemd[1]: Cannot find unit for notify message of PID 1326, ignoring.
+Nov 01 20:03:48 mobula kernel: kauditd_printk_skb: 155 callbacks suppressed
+Nov 01 20:03:48 mobula systemd[1]: Cannot find unit for notify message of PID 1385, ignoring.
+Nov 01 20:03:48 mobula gdm-autologin][1393]: gkr-pam: no password is available for user
+Nov 01 20:03:50 mobula xrdp[1374]: [ERROR] g_tcp_bind(11, 3389) failed bind IPv6 (errno=98) and IPv4 (errno=22).
+Nov 01 20:03:50 mobula xrdp[1374]: [ERROR] trans_listen_address failed
+Nov 01 20:03:50 mobula xrdp[1374]: [ERROR] xrdp_listen_main_loop: xrdp_listen_get_port failed
+Nov 01 20:03:50 mobula systemd[1]: xrdp.service: Failed with result 'exit-code'.
+Nov 01 20:03:50 mobula systemd[1]: xrdp-sesman.service: Failed with result 'exit-code'.
+Nov 01 20:03:51 mobula gdm-autologin][1393]: gkr-pam: couldn't unlock the login keyring.
+Nov 01 20:03:51 mobula pipewire[1431]: mod.jackdbus-detect: Failed to receive jackdbus reply: org.freedesktop.DBus.Error.ServiceUnknown: The name org.jackaudio.service was not provided by any .service files
+Nov 01 20:03:51 mobula wireplumber[1435]: Failed to get percentage from UPower: org.freedesktop.DBus.Error.NameHasNoOwner
+Nov 01 20:03:52 mobula wireplumber[1435]: <WpPortalPermissionStorePlugin:0xaaaae6868410> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
+Nov 01 20:03:52 mobula wireplumber[1435]: <WpPortalPermissionStorePlugin:0xaaaae6868410> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
+Nov 01 20:03:52 mobula wireplumber[1435]: <WpPortalPermissionStorePlugin:0xaaaae6868410> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
+Nov 01 20:03:52 mobula wireplumber[1435]: <WpPortalPermissionStorePlugin:0xaaaae6868410> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
+Nov 01 20:03:52 mobula wireplumber[1435]: <WpPortalPermissionStorePlugin:0xaaaae6868410> Failed to call Lookup: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for camera
+Nov 01 20:03:53 mobula gnome-keyring-daemon[1615]: discover_other_daemon: 1
+Nov 01 20:03:53 mobula systemd[1416]: app-gnome-gnome\x2dkeyring\x2dsecrets-1607.scope: Failed to add PIDs to scope's control group: No such process
+Nov 01 20:03:53 mobula systemd[1416]: app-gnome-gnome\x2dkeyring\x2dsecrets-1607.scope: Failed with result 'resources'.
+Nov 01 20:03:53 mobula systemd[1416]: Failed to start app-gnome-gnome\x2dkeyring\x2dsecrets-1607.scope - Application launched by gnome-session-binary.
+Nov 01 20:03:53 mobula gnome-keyring-daemon[1619]: discover_other_daemon: 1
+Nov 01 20:03:53 mobula gnome-keyring-daemon[1620]: discover_other_daemon: 1
+Nov 01 20:03:53 mobula systemd[1416]: app-gnome-gnome\x2dkeyring\x2dpkcs11-1613.scope: Failed to add PIDs to scope's control group: No such process
+Nov 01 20:03:53 mobula systemd[1416]: app-gnome-gnome\x2dkeyring\x2dpkcs11-1613.scope: Failed with result 'resources'.
+Nov 01 20:03:53 mobula systemd[1416]: Failed to start app-gnome-gnome\x2dkeyring\x2dpkcs11-1613.scope - Application launched by gnome-session-binary.
+Nov 01 20:03:53 mobula systemd[1416]: app-gnome-gnome\x2dkeyring\x2dssh-1609.scope: No PIDs left to attach to the scope's control group, refusing.
+Nov 01 20:03:53 mobula systemd[1416]: app-gnome-gnome\x2dkeyring\x2dssh-1609.scope: Failed with result 'resources'.
+Nov 01 20:03:53 mobula systemd[1416]: Failed to start app-gnome-gnome\x2dkeyring\x2dssh-1609.scope - Application launched by gnome-session-binary.
+Nov 01 20:03:53 mobula gnome-session-binary[1593]: GnomeDesktop-WARNING: Could not create transient scope for PID 1623: GDBus.Error:org.freedesktop.DBus.Error.UnixProcessIdUnknown: Failed to set unit properties: No such process
+Nov 01 20:03:54 mobula systemd[1]: kerneloops.service: Found left-over process 1680 (kerneloops) in control group while starting unit. Ignoring.
+Nov 01 20:03:54 mobula systemd[1]: kerneloops.service: This usually indicates unclean termination of a previous run, or service implementation deficiencies.
+Nov 01 20:03:54 mobula (rneloops)[1681]: kerneloops.service: Referenced but unset environment variable evaluates to an empty string: DAEMON_ARGS
+Nov 01 20:03:58 mobula gnome-shell[1626]: g_close(fd:0) failed with EBADF. The tracking of file descriptors got messed up
+Nov 01 20:03:58 mobula gnome-shell[1626]: Failed to open gpu '/dev/dri/card0': No suitable mode setting backend found
+Nov 01 20:04:02 mobula systemd[1416]: Dependency failed for org.gnome.SettingsDaemon.XSettings.service - GNOME XSettings service.
+Nov 01 20:04:03 mobula gnome-shell[1626]: Gio.UnixInputStream has been moved to a separate platform-specific library. Please update your code to use GioUnix.InputStream instead.
                                           0 inhibit() ["resource:///org/gnome/shell/misc/loginManager.js":209:8]
                                           1 InterpretGeneratorResume() ["self-hosted":1461:33]
                                           2 AsyncFunctionNext() ["self-hosted":852:26]
                                           3 anonymous() ["resource:///org/gnome/shell/ui/init.js":21:19]
-Nov 01 17:10:47 mobula at-spi2-registr[1780]: Failed to register client: GDBus.Error:org.gnome.SessionManager.AlreadyRegistered: Unable to register client
-Nov 01 17:10:47 mobula at-spi2-registr[1780]: Unable to register client with session manager
-Nov 01 17:10:47 mobula gnome-session-binary[1614]: GnomeDesktop-WARNING: Could not create transient scope for PID 2008: GDBus.Error:org.freedesktop.DBus.Error.UnixProcessIdUnknown: Failed to set unit properties: No such process
-Nov 01 17:10:47 mobula systemd[1435]: app-gnome-user\x2ddirs\x2dupdate\x2dgtk-1984.scope: No PIDs left to attach to the scope's control group, refusing.
-Nov 01 17:10:47 mobula systemd[1435]: app-gnome-user\x2ddirs\x2dupdate\x2dgtk-1984.scope: Failed with result 'resources'.
-Nov 01 17:10:47 mobula systemd[1435]: Failed to start app-gnome-user\x2ddirs\x2dupdate\x2dgtk-1984.scope - Application launched by gnome-session-binary.
-Nov 01 17:13:30 mobula kernel: rcu: INFO: rcu_preempt detected expedited stalls on CPUs/tasks: { P2576 } 21 jiffies s: 1185 root: 0x0/T
-Nov 01 17:13:30 mobula kernel: rcu: blocking rcu_node structures (internal RCU debug):
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula gsd-media-keys[1936]: Failed to grab accelerator for keybinding settings:hibernate
-Nov 01 17:13:31 mobula gsd-media-keys[1936]: Failed to grab accelerator for keybinding settings:playback-repeat
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:13:31 mobula evolution-alarm[2070]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:14:25 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:26 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:15:56 mobula update-notifier[3249]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
-Nov 01 17:16:21 mobula update-notifier[3249]: Unable to connect to the Notification Watcher: Timeout was reached
-Nov 01 17:16:22 mobula update-notifier[3249]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
-Nov 01 17:16:22 mobula update-notifier[3249]: Unable to connect to the Notification Watcher: Timeout was reached
-Nov 01 17:16:22 mobula update-notifier[3249]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
-Jul 02 21:05:54 mobula systemd-journald[397]: File /var/log/journal/b56bdb9fa798498294266b5a2d872e03/system.journal corrupted or uncleanly shut down, renaming and replacing.
+Nov 01 20:04:04 mobula at-spi2-registr[1750]: Failed to register client: GDBus.Error:org.gnome.SessionManager.AlreadyRegistered: Unable to register client
+Nov 01 20:04:04 mobula at-spi2-registr[1750]: Unable to register client with session manager
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula gsd-media-keys[1900]: Failed to grab accelerator for keybinding settings:playback-repeat
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula gsd-media-keys[1900]: Failed to grab accelerator for keybinding settings:hibernate
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:38:12 mobula evolution-alarm[2090]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:06 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:14 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:15 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:16 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 09:39:41 mobula update-notifier[2538]: Unable to connect to the Notification Watcher: Timeout was reached
+Nov 02 09:39:41 mobula update-notifier[2538]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
+Nov 02 09:39:41 mobula update-notifier[2538]: Unable to connect to the Notification Watcher: Timeout was reached
+Nov 02 09:39:41 mobula update-notifier[2538]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 10:36:12 mobula update-notifier[2538]: gdk_monitor_get_scale_factor: assertion 'GDK_IS_MONITOR (monitor)' failed
+Nov 02 12:06:56 mobula kernel: rcu: INFO: rcu_preempt detected expedited stalls on CPUs/tasks: { P2466 } 21 jiffies s: 1425 root: 0x0/T
+Nov 02 12:06:56 mobula kernel: rcu: blocking rcu_node structures (internal RCU debug):
+Nov 02 12:06:56 mobula tracker-miner-f[2456]: Owner of volume monitor org.gtk.vfs.GPhoto2VolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:56 mobula tracker-miner-f[2456]: Owner of volume monitor org.gtk.vfs.GoaVolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:56 mobula tracker-miner-f[2456]: Owner of volume monitor org.gtk.vfs.AfcVolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:56 mobula tracker-miner-f[2456]: Owner of volume monitor org.gtk.vfs.UDisks2VolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:56 mobula tracker-miner-f[2456]: Owner of volume monitor org.gtk.vfs.MTPVolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:56 mobula gnome-shell[1626]: Owner of volume monitor org.gtk.vfs.GPhoto2VolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:56 mobula gnome-shell[1626]: Owner of volume monitor org.gtk.vfs.GoaVolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:57 mobula gnome-shell[1626]: Owner of volume monitor org.gtk.vfs.AfcVolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:57 mobula gnome-shell[1626]: Owner of volume monitor org.gtk.vfs.UDisks2VolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:57 mobula gnome-shell[1626]: Owner of volume monitor org.gtk.vfs.MTPVolumeMonitor disconnected from the bus; removing drives/volumes/mounts
+Nov 02 12:06:57 mobula gsd-media-keys[1900]: Unable to get default sink
+Nov 02 12:06:59 mobula gdm3[1376]: Gdm: Failed to contact accountsservice: Error calling StartServiceByName for org.freedesktop.Accounts: Transaction for accounts-daemon.service/start is destructive (poweroff.target has 'start' job queued, but 'stop' is included in transaction).
+Nov 02 12:06:59 mobula systemd[1]: gdm.service: Failed with result 'exit-code'.
+Nov 02 12:06:59 mobula systemd[1]: gdm.service: Failed to enqueue OnFailure= job, ignoring: Transaction for plymouth-quit.service/start is destructive (shutdown.target has 'start' job queued, but 'stop' is included in transaction).
+Nov 02 12:06:59 mobula gnome-shell[1626]: Error checking authorization for action id org.freedesktop.bolt.enroll: GDBus.Error:org.freedesktop.DBus.Error.NoReply: Message recipient disconnected from message bus without replying
+Nov 02 12:06:59 mobula gnome-shell[1626]: Error checking authorization for action id org.freedesktop.NetworkManager.network-control: GDBus.Error:org.freedesktop.DBus.Error.NoReply: Message recipient disconnected from message bus without replying
+Nov 02 12:06:59 mobula gsd-power[1904]: Unable to inhibit lid switch: GDBus.Error:org.freedesktop.DBus.Error.NoReply: Message recipient disconnected from message bus without replying
+Nov 02 12:07:00 mobula gnome-shell[1626]: Connection to xwayland lost
+Nov 02 12:07:00 mobula systemd[1416]: xdg-desktop-portal-gtk.service: Failed with result 'exit-code'.
+Nov 02 12:07:01 mobula gnome-keyring-daemon[1441]: couldn't prompt for password: The operation was cancelled
+Nov 02 12:07:01 mobula gnome-keyring-d[1441]: couldn't prompt for password: The operation was cancelled
+Nov 02 12:07:01 mobula remmina[2054]: cannot open display: :0
+Nov 02 12:07:01 mobula evolution-calen[2222]: Error setting property 'ConnectionStatus' on interface org.gnome.evolution.dataserver.Source: The connection is closed (g-io-error-quark, 18)
+Nov 02 12:07:02 mobula NetworkManager[1115]: <warn>  [1762060022.5410] dispatcher: (11) failed (after 0.011 sec): Transaction for NetworkManager-dispatcher.service/start is destructive (swap.target has 'stop' job queued, but 'start' is included in transaction).
