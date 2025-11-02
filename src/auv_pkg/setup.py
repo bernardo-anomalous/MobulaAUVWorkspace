@@ -31,7 +31,8 @@ setup(
             "depth_sensor = auv_pkg.depth_node:main",
             "acceleration_node = auv_pkg.acceleration_node:main",
             "battery_node = auv_pkg.battery_node:main",
-            "system_monitor_node = auv_pkg.system_monitor_node:main"
+            "system_monitor_node = auv_pkg.system_monitor_node:main",
+            "console_bridge_node = auv_pkg.console_bridge_node:main",
         ],
     },
 )
