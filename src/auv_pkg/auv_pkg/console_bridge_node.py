@@ -6,7 +6,7 @@ from typing import Final
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from rosgraph_msgs.msg import Log
+from rcl_interfaces.msg import Log
 from std_msgs.msg import String
 
 
