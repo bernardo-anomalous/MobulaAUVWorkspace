@@ -47,7 +47,7 @@ class SystemMonitorNode(Node):
         self.event_window_sec = self.declare_parameter('event_window_sec', 300.0).value
         self.max_log_files = int(self.declare_parameter('max_log_files', 3).value)
         self.include_prev_boot = bool(self.declare_parameter('include_prev_boot', True).value)
-        default_log_dir = os.path.expanduser('~/MobulaAUVWorkspace/src/auv_pkg/auv_pkg/system_monitor_logs')
+        default_log_dir = os.path.expanduser('/home/mobula/Documents/MobulaRos2/src/auv_pkg/auv_pkg/system_monitor_logs')
         self.log_dir = pathlib.Path(self.declare_parameter('log_dir', default_log_dir).value)
         self.summary_topic = self.declare_parameter('summary_topic', '/system/summary').value
         self.events_topic = self.declare_parameter('events_topic', '/system/events').value

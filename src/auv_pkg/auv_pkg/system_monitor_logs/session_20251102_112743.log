@@ -1,0 +1,23 @@
+Session start: 2025-11-02T11:27:43.744570
+Session end: 2025-11-02T11:32:12.070478
+Uptime: 01h54m
+Session duration: 0:04:28.325908
+Max CPU temperature: 51.6°C
+Event counters:
+  undervoltage_events: 0
+  overvoltage_events: 0
+  throttled_events: 0
+  overtemp_events: 0
+Warnings:
+  [11:27:43] ℹ Startup[log_directory]: Log directory ready at /home/mobula/Documents/MobulaRos2/src/auv_pkg/auv_pkg/system_monitor_logs
+  [11:27:43] ℹ Startup[publishers]: Publishers initialised
+  [11:27:43] ℹ Startup[initialisation]: System monitor node initialising
+  [11:27:43] ℹ Startup[parameters]: Startup parameters initialised
+  [11:27:43] ℹ Startup[dependency:psutil]: psutil module available
+  [11:27:44] ℹ Startup[dependency:vcgencmd]: vcgencmd command available
+  [11:27:44] ℹ Startup[dependency:journalctl]: journalctl command available
+  [11:27:44] ℹ Startup[previous_boot_analysis]: Analysing previous boot information
+  [11:27:49] ℹ Startup[previous_boot_analysis]: Previous boot analysis complete
+  [11:27:49] ℹ Startup[timers]: Fast and slow timers initialised
+  [11:27:49] ℹ Startup[signal_handlers]: Signal handlers registered
+  [11:27:49] ℹ Startup[startup_complete]: Startup completed successfully; system monitor operational.
