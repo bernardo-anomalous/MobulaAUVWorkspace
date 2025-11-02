@@ -476,6 +476,16 @@ class SystemMonitorNode(Node):
     def _analyze_previous_boot(self) -> None:
         issues: List[str] = []
         log_lines: List[str] = []
+        status_tags: List[str] = []
+
+        power_loss_keywords = (
+            'uncleanly shut down',
+            'system.journal corrupted',
+        )
+        normal_shutdown_markers = (
+            'systemd-shutdown',
+            'rebooting.',
+        )
 
         journal_available = shutil.which('journalctl') is not None
         if journal_available:
@@ -497,6 +507,45 @@ class SystemMonitorNode(Node):
                     issues.append('Throttling recorded before shutdown')
                 if any('panic' in line for line in lowered):
                     issues.append('Kernel panic reported in previous session')
+
+                try:
+                    journal_full = subprocess.run(
+                        ['journalctl', '-b', '-1', '--no-pager', '-n', '2000'],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    if journal_full.stdout:
+                        full_lines = journal_full.stdout.splitlines()
+                        lowered_full = [line.lower() for line in full_lines]
+
+                        suspected_lines = [
+                            original
+                            for original, lowered_line in zip(full_lines, lowered_full)
+                            if any(keyword in lowered_line for keyword in power_loss_keywords)
+                        ]
+                        if suspected_lines:
+                            if 'POWER_LOSS_SUSPECTED' not in status_tags:
+                                status_tags.append('POWER_LOSS_SUSPECTED')
+                            detail = 'System journal indicates unclean shutdown (possible power loss)'
+                            if detail not in issues:
+                                issues.append(detail)
+                            log_lines.extend(suspected_lines)
+
+                        markers_present = any(
+                            any(marker in lowered_line for marker in normal_shutdown_markers)
+                            for lowered_line in lowered_full
+                        )
+                        if not markers_present:
+                            if 'POWER_LOSS_SUSPECTED' in status_tags:
+                                status_tags = [tag for tag in status_tags if tag != 'POWER_LOSS_SUSPECTED']
+                            if 'UNEXPECTED_POWER_LOSS' not in status_tags:
+                                status_tags.insert(0, 'UNEXPECTED_POWER_LOSS')
+                            detail = 'Normal shutdown markers missing from journal'
+                            if detail not in issues:
+                                issues.append(detail)
+                except Exception:
+                    pass
             except Exception:
                 log_lines.append('journalctl query failed during previous boot analysis.')
         else:
@@ -504,7 +553,7 @@ class SystemMonitorNode(Node):
                 self.get_logger().info('Note: journalctl not available; previous-boot analysis skipped.')
                 self.warned_missing_journalctl = True
 
-        _, throttle_flags = self._read_throttled_flags()
+        throttle_value, throttle_flags = self._read_throttled_flags()
         if throttle_flags['undervoltage_history'] and 'Undervoltage detected during previous boot' not in issues:
             issues.append('Undervoltage detected during previous boot')
         if throttle_flags['throttled_history'] and 'Throttling recorded before shutdown' not in issues:
@@ -512,14 +561,41 @@ class SystemMonitorNode(Node):
         if throttle_flags['soft_temp_limit'] and 'Thermal event recorded before shutdown' not in issues:
             issues.append('Thermal event recorded before shutdown')
 
+        if throttle_value is not None:
+            if throttle_value & 0x1 or throttle_value & 0x10000:
+                if 'UNDER_VOLTAGE_HISTORY' not in status_tags:
+                    status_tags.append('UNDER_VOLTAGE_HISTORY')
+                detail = 'Raspberry Pi reported undervoltage history bits set'
+                if detail not in issues:
+                    issues.append(detail)
+
         status_message = 'previous_shutdown: NOMINAL'
+        status_summary = ', '.join(status_tags) if status_tags else 'NOMINAL'
+        detail_text = '; '.join(issues)
+
+        if status_tags:
+            status_message = f'previous_shutdown: {status_summary}'
+
         if issues:
-            status_message = 'previous_shutdown: ⚠ ' + '; '.join(issues)
+            if status_tags:
+                status_message = f'{status_message} | {detail_text}'
+            else:
+                status_message = f'previous_shutdown: ⚠ {detail_text}'
             for issue in issues:
                 self.maybe_warn(True, issue)
-            self.previous_shutdown_reason = '; '.join(issues)
+            if status_tags:
+                self.previous_shutdown_reason = f'{status_summary} | {detail_text}'
+            else:
+                self.previous_shutdown_reason = detail_text
         else:
-            self.previous_shutdown_reason = 'nominal'
+            self.previous_shutdown_reason = status_summary if status_tags else 'nominal'
+
+        if status_summary != 'NOMINAL':
+            self.get_logger().warning(f'Previous shutdown classified as {status_summary}')
+        elif issues:
+            self.get_logger().warning(f'Previous shutdown issues detected: {detail_text}')
+        else:
+            self.get_logger().info('Previous shutdown classified as NOMINAL')
 
         self.cached_metrics['last_boot_reason'] = self.previous_shutdown_reason
 
