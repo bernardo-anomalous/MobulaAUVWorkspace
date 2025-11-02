@@ -1,5 +1,5 @@
-Previous boot analysis generated 2025-11-02T11:27:43.744570
-Status: previous_shutdown: NOMINAL
+Previous boot analysis generated 2025-11-02T11:48:37.785172
+Status: previous_shutdown: UNEXPECTED_POWER_LOSS | System journal indicates unclean shutdown (possible power loss); Normal shutdown markers missing from journal
 --- journalctl excerpts ---
 Jul 02 21:05:53 mobula kernel: pci_bus 0000:01: supply vpcie3v3 not found, using dummy regulator
 Jul 02 21:05:53 mobula kernel: pci_bus 0000:01: supply vpcie3v3aux not found, using dummy regulator
@@ -431,3 +431,4 @@ Nov 01 17:16:21 mobula update-notifier[3249]: Unable to connect to the Notificat
 Nov 01 17:16:22 mobula update-notifier[3249]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
 Nov 01 17:16:22 mobula update-notifier[3249]: Unable to connect to the Notification Watcher: Timeout was reached
 Nov 01 17:16:22 mobula update-notifier[3249]: gtk_widget_get_scale_factor: assertion 'GTK_IS_WIDGET (widget)' failed
+Jul 02 21:05:54 mobula systemd-journald[397]: File /var/log/journal/b56bdb9fa798498294266b5a2d872e03/system.journal corrupted or uncleanly shut down, renaming and replacing.
