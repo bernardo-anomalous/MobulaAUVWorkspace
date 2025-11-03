@@ -5,7 +5,12 @@ from typing import Final
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import (
+    QoSProfile,
+    ReliabilityPolicy,
+    HistoryPolicy,
+    DurabilityPolicy,
+)
 from rcl_interfaces.msg import Log
 from std_msgs.msg import String
 
@@ -24,13 +29,23 @@ class ConsoleBridgeNode(Node):
 
     def __init__(self) -> None:
         super().__init__("console_bridge_node")
-        qos = QoSProfile(
+        publisher_qos = QoSProfile(
             depth=200,
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        subscription_qos = QoSProfile(
+            depth=200,
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
         )
-        self._publisher = self.create_publisher(String, "console_bridge/log", qos)
-        self.create_subscription(Log, "/rosout", self._handle_log, qos)
+        self._publisher = self.create_publisher(
+            String, "console_bridge/log", publisher_qos
+        )
+        self.create_subscription(
+            Log, "/rosout", self._handle_log, subscription_qos
+        )
 
     def _handle_log(self, msg: Log) -> None:
         level = _LEVEL_MAP.get(msg.level, f"LEVEL_{msg.level}")
