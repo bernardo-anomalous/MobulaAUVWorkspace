@@ -13,4 +13,5 @@
     <node pkg="auv_pkg" exec="acceleration_node"/> 
     <node pkg="auv_pkg" exec="battery_node"/> 
     <node pkg="auv_pkg" exec="system_monitor_node"/> 
+    <node pkg="auv_pkg" exec="console_bridge_node"/> 
 </launch>
