@@ -12,6 +12,7 @@ flowchart LR
         IMU[imu_node]
         Depth[depth_node]
         Accel[acceleration_node]
+        Batt[battery_node]
     end
     subgraph Control
         Pitch[pitch_pid]
@@ -35,6 +36,7 @@ flowchart LR
     Driver -- current_servo_angles --> Interp
     Depth -->|/depth| Sensors
     Accel -->|/acceleration/processed| Sensors
+    Batt -->|/battery/*| Sensors
 ```
 ```
 
@@ -107,6 +109,12 @@ IMU data -> remove gravity -> /acceleration/processed
 - **keyboard_control_swim** lets an operator send target pitch/roll and movement sequences.
 - **camera_control** can track arm gestures and publish servo commands directly.
 
+### Support nodes
+
+- **battery_node** samples INA260 sensors and reports pack voltage, current, and estimated runtime.
+- **system_monitor_node** reports CPU temperature, throttling, and resource usage.
+- **console_bridge_node** rebroadcasts `/rosout` logs as plain text on `console_bridge/log`.
+
 ## Launch Order
 
 The launch file `mobula.launch.xml` starts nodes in this order:
@@ -118,9 +126,12 @@ The launch file `mobula.launch.xml` starts nodes in this order:
 5. `roll_pid`
 6. `depth_node`
 7. `acceleration_node`
+8. `battery_node`
+9. `system_monitor_node`
+10. `console_bridge_node`
 
-`servo_driver` is delayed slightly after the IMU initializes. Depth and acceleration
-sensors launch after the control loops.
+`servo_driver` is delayed slightly after the IMU initializes. Telemetry nodes launch
+after the control loops so they can observe the rest of the system.
 
 ---
 Use this quick guide when you need a high-level picture of how the Mobula AUV ROS2 system fits together.
