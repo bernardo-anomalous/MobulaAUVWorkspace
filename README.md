@@ -43,8 +43,11 @@ Source: `auv_custom_interfaces/msg/ServoMovementCommand.msg` lines 1‑11【F:sr
 5. `roll_pid` – wing roll PID controller.
 6. `depth_sensor` – reads the MS5837 depth sensor.
 7. `acceleration_node` – converts IMU data to world‑frame acceleration.
+8. `battery_node` – monitors pack voltage, current, and state of charge.
+9. `system_monitor_node` – publishes CPU, thermal, and power throttling status.
+10. `console_bridge_node` – rebroadcasts `/rosout` in a plain‑text topic.
 
-Source lines【F:src/mobula_bringup/launch/mobula.launch.xml†L3-L13】.
+Source lines【F:src/mobula_bringup/launch/mobula.launch.xml†L1-L16】.
 
 ### Node Interaction Diagram
 
@@ -120,11 +123,10 @@ Lifecycle node controlling the PCA9685 servo board.
 
 ### `servo_interpolation.py`
 Interpolates complex movements into small servo steps.
-* Parameters `interpolation_density`, `update_rate_hz`, and `cross_fade_factor` control resolution and blending【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L15-L21】.
-* Parameters `interrupt_transition_duration` and `interrupt_transition_easing` tune the blend from current angles to the first step of a new command【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L15-L25】.
-* Generates servo commands at `update_rate_hz` (70 Hz by default). This determines how often new angles are sent to `servo_driver`.
-* Subscribes to `servo_interpolation_commands` and publishes resulting `ServoMovementCommand` messages to `servo_driver_commands`【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L24-L32】.
-* Maintains the last known servo angles so movements can cross‑fade smoothly.
+* Parameters `interpolation_density`, `update_rate_hz`, `cross_fade_factor`, and `interrupt_transition_duration` tune resolution and how aggressively new commands blend in【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L13-L36】.
+* Subscribes to `servo_interpolation_commands` and the latest `current_servo_angles`, then publishes interpolated `ServoMovementCommand` messages on `servo_driver_commands`【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L28-L52】.
+* Publishes `HoldRequest` messages on `wing_hold_request` so the wing controller can request a pause, and ignores new commands while a hold is active【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L37-L47】【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L59-L79】.
+* Generates servo commands at `update_rate_hz` (70 Hz by default); when a command ends the final angles are maintained instead of forcing a return to glide position【F:src/auv_pkg/auv_pkg/servo_interpolation.py†L82-L143】.
 
 ### `pitch_pid.py`
 Tail pitch and roll PID controller.
@@ -145,19 +147,34 @@ Wing roll PID controller.
 
 ### `depth_node.py`
 Reads the MS5837 pressure sensor and outputs filtered depth measurements.
-* Calibrates surface pressure at startup and sets a deadband threshold of ±5 cm to prevent jitter【F:src/auv_pkg/auv_pkg/depth_node.py†L27-L37】【F:src/auv_pkg/auv_pkg/depth_node.py†L33-L35】.
-* Publishes seawater depth on `/depth` and an air‑reference depth on `/depth_air` every 0.5 s【F:src/auv_pkg/auv_pkg/depth_node.py†L15-L17】【F:src/auv_pkg/auv_pkg/depth_node.py†L38-L41】.
+* Calibrates surface pressure and an air reference at startup, then filters readings with a five-sample moving average and a ±5 cm deadband to prevent jitter【F:src/auv_pkg/auv_pkg/depth_node.py†L12-L67】【F:src/auv_pkg/auv_pkg/depth_node.py†L74-L104】.
+* Publishes seawater depth on `/depth` and an air-reference depth on `/depth_air` every 0.5 s (2 Hz)【F:src/auv_pkg/auv_pkg/depth_node.py†L12-L15】【F:src/auv_pkg/auv_pkg/depth_node.py†L92-L105】.
 
 ### `acceleration_node.py`
 Computes world‑frame acceleration from IMU data.
-* Parameters `imu_topic`, `publish_topic`, `gravity_m_s2` and `mount_orientation_rpy_deg` define the input and transformation【F:src/auv_pkg/auv_pkg/acceleration_node.py†L14-L26】.
-* Publishes processed acceleration on `/acceleration/processed` at 10 Hz【F:src/auv_pkg/auv_pkg/acceleration_node.py†L31-L39】.
+* Parameters `imu_topic`, `publish_topic`, `gravity_m_s2`, and `mount_orientation_rpy_deg` define the input stream and the rotation applied to the IMU frame【F:src/auv_pkg/auv_pkg/acceleration_node.py†L9-L25】.
+* Uses SciPy to rotate acceleration into world coordinates, subtract gravity, and publish `/acceleration/processed` at 10 Hz【F:src/auv_pkg/auv_pkg/acceleration_node.py†L1-L46】.
 
 ### `keyboard_control.py` & `keyboard_control_swim.py`
 Provide manual control using the keyboard.
 * Publish target pitch and roll values on `target_pitch` and `target_roll`【F:src/auv_pkg/auv_pkg/keyboard_control.py†L18-L21】.
 * Use a lifecycle service client to command state transitions of `servo_driver`【F:src/auv_pkg/auv_pkg/keyboard_control.py†L22-L30】.
 * The `swim` variant can send canned `ServoMovementCommand` sequences and enable/disable the wing PID via `wing_pid_active`【F:src/auv_pkg/auv_pkg/keyboard_control_swim.py†L18-L21】【F:src/auv_pkg/auv_pkg/keyboard_control_swim.py†L20-L21】.
+
+### `battery_node.py`
+Monitors up to two INA260 power monitors.
+* Publishes voltage, current, power, state of charge, usage counters, and estimated runtime for each pack under topics such as `/battery/compute/voltage_V`, `/battery/compute/soc_pct`, and `/battery/compute/behavior_based_estimation`【F:src/auv_pkg/auv_pkg/battery_node.py†L82-L156】.
+* Tracks high-current events, logs them, and emits JSON payloads on `/battery/<pack>/current_monitor` and `/battery/<pack>/current_draw_critical` when thresholds are crossed【F:src/auv_pkg/auv_pkg/battery_node.py†L157-L259】.
+* Parameters cover I²C bus selection, pack capacities, series cell counts, sampling rate, and the behaviour window used for runtime estimates【F:src/auv_pkg/auv_pkg/battery_node.py†L263-L338】.
+
+### `system_monitor_node.py`
+Reports compute health and throttling status.
+* Publishes structured data on `/system/health` (`SystemHealth`), human-readable summaries on `/system/summary`, and detailed events on `/system/events`【F:src/auv_pkg/auv_pkg/system_monitor_node.py†L43-L112】.
+* Tracks CPU temperature, throttling flags, network throughput, disk usage, and previous shutdown reasons while writing session logs to disk【F:src/auv_pkg/auv_pkg/system_monitor_node.py†L113-L209】.
+
+### `console_bridge_node.py`
+Formats ROS log messages for lightweight clients.
+* Subscribes to `/rosout`, reformats entries with timestamp and severity, and republishes them on `console_bridge/log` using a transient-local QoS so late subscribers get the latest logs【F:src/auv_pkg/auv_pkg/console_bridge_node.py†L1-L41】.
 
 ### `camera_control.py`
 Optional node mapping arm/hand poses to servo commands using OpenCV and MediaPipe.

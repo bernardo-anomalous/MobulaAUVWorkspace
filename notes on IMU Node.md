@@ -44,23 +44,27 @@ RuntimeWarning: I2C frequency is not settable in python, ignoring!
 - `/imu/data` — `sensor_msgs/Imu`
 - `/imu/euler` — `geometry_msgs/Vector3` (roll, pitch, yaw)
 - `/imu/heading` — `std_msgs/String` (cardinal + degrees)
-- `/imu/health_status` — `std_msgs/String`  
-  Values include:  
+- `/imu/health_status` — `std_msgs/String`
+  Values include:
   `IMU OK`, `IMU HICCUP …`, `IMU UNSTABLE (…)`, `IMU SOFT RESET`, `IMU STAGNANT`, `IMU RESTARTING …`, `IMU OFFLINE`
+- `/imu/mode` — `std_msgs/String` with `NORMAL`, `ESTIMATED`, or `OFFLINE` to show when gyro-bridged estimates are active.【F:src/auv_pkg/auv_pkg/imu_node.py†L180-L207】
 
 **Parameters**
-- `poll_period_sec` (default **0.5**) — read/publish period  
-- `stagnant_timeout_sec` (default **3.0**) — if data doesn’t change for this long, node restarts
+- `i2c_bus_id` (default **3**) — target Linux I²C bus.【F:src/auv_pkg/auv_pkg/imu_node.py†L63-L84】
+- `i2c_address` (default **0x4B**) — device address for the BNO08x.【F:src/auv_pkg/auv_pkg/imu_node.py†L63-L84】
+- `poll_period_sec` (default **0.1 s**) — read/publish period (10 Hz by default).【F:src/auv_pkg/auv_pkg/imu_node.py†L85-L102】
+- `stagnant_timeout_sec` (default **3.0 s**) — if data doesn’t change for this long, restart the node.【F:src/auv_pkg/auv_pkg/imu_node.py†L73-L102】
+- `stagnant_orientation_tolerance`, `stagnant_accel_tolerance`, `stagnant_gyro_tolerance` — thresholds for stagnation detection; defaults keep tight bounds on quaternions and  acceleration/gyro drift.【F:src/auv_pkg/auv_pkg/imu_node.py†L103-L127】
 
 ---
 
 ## Initialization Strategy
 
-1. Prefer **`ExtendedI2C(1)`**; fall back to `busio.I2C` if ExtendedI2C is missing.
-2. Create `BNO08X_I2C(i2c, address=0x4B)`.
+1. Prefer **`ExtendedI2C(bus_id)`**; fall back to `busio.I2C` if ExtendedI2C is missing.【F:src/auv_pkg/auv_pkg/imu_node.py†L129-L212】
+2. Create `BNO08X_I2C(i2c, address=0x4B)` (address configurable via parameter).【F:src/auv_pkg/auv_pkg/imu_node.py†L129-L212】
 3. Enable features **one by one**, modest rate, **no batching**:
    - Accelerometer, Gyroscope, Rotation Vector.
-4. The node **tries** newer `enable_feature(feature, report_interval=…, batch_interval=…)` and **falls back** to the legacy signature when unsupported.  
+4. The node **tries** newer `enable_feature(feature, report_interval=…, batch_interval=…)` and **falls back** to the legacy signature when unsupported.
    You’ll see logs like:
    ```
    [IMU] enable_feature ok via attempt 4 (feature=0x1)
@@ -74,8 +78,8 @@ RuntimeWarning: I2C frequency is not settable in python, ignoring!
 - **Data validation** before publish:
   - Quaternion ~ unit length (±0.2)
   - Accel magnitude within 5–20 m/s²
-  - Gyro < ~35 rad/s (≈2000 °/s)  
-  Fail → “Invalid IMU data” hiccup; publish skipped.
+  - Gyro < ~35 rad/s (≈2000 °/s)
+  Fail → “Invalid IMU data” hiccup; publish skipped.【F:src/auv_pkg/auv_pkg/imu_node.py†L555-L707】
 
 - **Hiccup classification & recovery**
   - On common I²C/SHTP errors (`Errno 5`, `Remote I/O`, “Unprocessable Batch bytes”), try a **soft I²C reset**:
@@ -85,11 +89,14 @@ RuntimeWarning: I2C frequency is not settable in python, ignoring!
     4. On success, publish **`IMU SOFT RESET`** then **`IMU OK`**
 
 - **Failure window & escalation**
-  - Track failures in a 30 s sliding window.  
+  - Track failures in a 30 s sliding window.
     ≥3 failures → soft reset (up to 3 attempts) → minimal init (Accel only) → process restart (exec self).
 
 - **Stagnation watchdog**
-  - If data is unchanged for `stagnant_timeout_sec`, publish **`IMU STAGNANT`** and restart.
+  - If data is unchanged for `stagnant_timeout_sec`, publish **`IMU STAGNANT`** and restart.【F:src/auv_pkg/auv_pkg/imu_node.py†L103-L127】【F:src/auv_pkg/auv_pkg/imu_node.py†L511-L553】
+
+- **Gyro bridging mode**
+  - When sensor data hiccups briefly, the node integrates gyro rates for up to 1 s to keep publishing estimates, marks `/imu/mode` as `ESTIMATED`, then blends back to live data.【F:src/auv_pkg/auv_pkg/imu_node.py†L128-L212】【F:src/auv_pkg/auv_pkg/imu_node.py†L399-L511】
 
 - **Explicit health transitions**
   - After any recovery, the node actively publishes **`IMU OK`** so downstream nodes see the return-to-green.
