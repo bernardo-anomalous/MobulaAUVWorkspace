@@ -33,6 +33,7 @@ class ServoDriverNode(LifecycleNode):
         self.declare_parameter('update_rate_hz', 60.0)
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)
+        self.declare_parameter('stubborn', True)
 
         self.simulation_mode = False
         self.debug_logging = False
@@ -42,6 +43,7 @@ class ServoDriverNode(LifecycleNode):
         self.current_angles = []
         self.angle_tolerance_deg = 1.0  # Minimum change needed to update servo
         self.last_target_angles = [90.0] * 6
+        self.stubborn = bool(self.get_parameter('stubborn').value)
 
         self.angles_publisher = None
         self.command_subscriber = None
@@ -70,9 +72,18 @@ class ServoDriverNode(LifecycleNode):
         self.reset_attempts = 0
         self.max_reset_attempts = 3
 
+        # Track lifecycle restoration after a restart
+        self._restoration_target = os.environ.pop('SERVO_DRIVER_TARGET_STATE', None)
+        self._restoration_attempted = False
+        self._restoration_timer = self.create_timer(1.0, self._attempt_restore_lifecycle_state)
+
 
     def restart_process(self):
+        if not self.stubborn:
+            self.get_logger().error("Stubborn mode disabled; not restarting.")
+            return
         self.get_logger().error("Servo Driver Node restarting itself now...")
+        os.environ['SERVO_DRIVER_TARGET_STATE'] = self.last_lifecycle_state
         python = sys.executable
         os.execv(python, [python] + sys.argv)
 
@@ -111,6 +122,8 @@ class ServoDriverNode(LifecycleNode):
             return False
 
     def record_failure_and_check_restart(self):
+        if not self.stubborn:
+            return
         current_time = time.time()
         self.failure_timestamps.append(current_time)
         while self.failure_timestamps and (current_time - self.failure_timestamps[0] > self.failure_window_seconds):
@@ -356,6 +369,37 @@ class ServoDriverNode(LifecycleNode):
         self._publish_lifecycle_state()
         return TransitionCallbackReturn.SUCCESS
 
+    def _attempt_restore_lifecycle_state(self):
+        if self._restoration_attempted:
+            return
+        target_state = self._restoration_target
+        if not self.stubborn or not target_state:
+            self._restoration_attempted = True
+            return
+
+        self._restoration_attempted = True
+        try:
+            if target_state in ('inactive', 'active'):
+                config_result = self.on_configure(None)
+                if config_result != TransitionCallbackReturn.SUCCESS:
+                    self.get_logger().error(
+                        f"Failed to restore configure state ({config_result}); staying unconfigured."
+                    )
+                    return
+                if target_state == 'active':
+                    activate_result = self.on_activate(None)
+                    if activate_result != TransitionCallbackReturn.SUCCESS:
+                        self.get_logger().error(
+                            f"Failed to restore activation ({activate_result}); staying inactive."
+                        )
+                        return
+            self.get_logger().info(
+                f"Restored lifecycle state to '{self.last_lifecycle_state}' after restart (target was {target_state})."
+            )
+        except Exception as e:
+            self.get_logger().error(f"Error while restoring lifecycle state: {e}")
+            self.record_failure_and_check_restart()
+
     def _servo_command_callback(self, msg: ServoMovementCommand):
         if self.debug_logging:
             self.get_logger().info(f'Received command: {msg}')
@@ -446,6 +490,12 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         node.get_logger().info('Keyboard interrupt, shutting down.')
+    except Exception as e:
+        node.get_logger().error(f"Unhandled exception: {e}")
+        if node.stubborn:
+            node.restart_process()
+        else:
+            raise
     finally:
         node.destroy_node()
         if rclpy.ok():
