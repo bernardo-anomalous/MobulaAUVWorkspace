@@ -169,44 +169,41 @@ write_conf() {
   local cam="$1"
   run "$SUDO install -d -m 755 -o root -g root \"${MTX_ETC_DIR}\"" || return 1
   
-  # Backup existing config
   if [[ -f "${MTX_CONF}" ]] && ! grep -q "${STAMP}" "${MTX_CONF}"; then
     run "$SUDO cp -n \"${MTX_CONF}\" \"${MTX_CONF}.bak.$(date +%Y%m%d%H%M%S)\"" || true
   fi
 
-  # --- SMART ENCODER LOGIC ---
-  # Default Input settings
-# Default Input settings
-  # Added -input_format mjpeg to fix USB bandwidth bottleneck (restores 30fps)
-  local INPUT_FLAGS="-f v4l2 -input_format mjpeg -framerate ${FRAMERATE} -video_size ${RESOLUTION}"
+  # --- LATENCY & ENCODER LOGIC ---
+  
+  # 1. INPUT OPTIMIZATION
+  # -fflags nobuffer: Don't fill a buffer before decoding
+  # -flags low_delay: Tell the decoder this is realtime
+  # -input_format mjpeg: Solves USB bandwidth bottleneck
+  local INPUT_FLAGS="-fflags nobuffer -flags low_delay -f v4l2 -input_format mjpeg -framerate ${FRAMERATE} -video_size ${RESOLUTION}"
   local OUTPUT_FLAGS=""
   
   local MODEL
-  # We strip null bytes to prevent bash warnings
   MODEL=$(cat /sys/firmware/devicetree/base/model 2>/dev/null | tr -d '\0' || echo "Unknown")
 
-  # 1. CHECK: Did user say the camera handles encoding?
   if [[ "${CAM_ENCODES}" == "yes" ]] || [[ "${CAM_ENCODES}" == "true" ]]; then
-     log "Mode: PASS-THROUGH (Camera handles H.264)"
+     log "Mode: PASS-THROUGH (Low Latency)"
      INPUT_FLAGS="${INPUT_FLAGS} -input_format h264"
      OUTPUT_FLAGS="-vcodec copy"
 
-  # 2. CHECK: Is this a Pi 4? (Use Hardware Encoder)
   elif [[ "$MODEL" == *"Raspberry Pi 4"* ]]; then
-     log "Mode: PI 4 HARDWARE ENCODE (h264_v4l2m2m)"
-     # Uses the Pi 4 V3D hardware block (Low CPU/RAM)
-     OUTPUT_FLAGS="-vcodec h264_v4l2m2m -b:v 2M -pix_fmt yuv420p"
+     log "Mode: PI 4 HARDWARE ENCODE (Low Latency)"
+     # -g 15: Keyframe every 0.5s (fast recovery from glitches)
+     # -num_capture_buffers 3: Don't buffer frames in GPU memory
+     OUTPUT_FLAGS="-vcodec h264_v4l2m2m -b:v 2M -pix_fmt yuv420p -g 15 -num_capture_buffers 3"
 
-  # 3. CHECK: Fallback (Pi 5 or generic Linux)
   else
-     log "Mode: SOFTWARE ENCODE (libx264)"
-     OUTPUT_FLAGS="-vcodec libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p"
+     log "Mode: SOFTWARE ENCODE (Low Latency)"
+     OUTPUT_FLAGS="-vcodec libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -g 15"
   fi
   # ---------------------------
 
   local TMP
   TMP=$(mktemp)
-  # FIXED: Removed 'urls' list, used 'url' singular as per MediaMTX latest spec
   cat > "${TMP}" <<YAML
 ${STAMP}
 webrtc: yes
