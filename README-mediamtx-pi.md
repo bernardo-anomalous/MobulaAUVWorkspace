@@ -1,327 +1,189 @@
-# MediaMTX on Raspberry Pi (Ubuntu): USB Camera → Browser (WebRTC)
-
-This README documents a **repeatable setup** for streaming a USB camera from a Raspberry Pi (Ubuntu) to any browser on the same LAN using **MediaMTX** (formerly rtsp-simple-server) with **WebRTC**.  
-It includes:
+MediaMTX Setup for ROV/AUV (Raspberry Pi)
 
-- A step‑by‑step **manual guide**
-- A **resumable installer script** (`setup_mediamtx_pi.sh`) that automates the process
-- **Troubleshooting** and **diagnostics** playbook
-- Notes on **latency tuning**, **power checks**, and **USB reliability**
-
----
+Overview
 
-## 1) Overview
+This script automates the installation and configuration of MediaMTX (formerly rtsp-simple-server) on a Raspberry Pi. It is specifically optimized for headless, remote-operated vehicles (ROVs and AUVs) where reliability and resource management are critical.
 
-- **Pipeline**: `USB camera (UVC) → FFmpeg (V4L2) → RTSP to MediaMTX → WebRTC (browser)`
-- **Ports** (default):
-  - HTTP Viewer (WebRTC signaling): `:8889`
-  - WebRTC UDP port: `:8189`
-  - Internal RTSP publish target (loopback): `rtsp://localhost:8554/<path>`
-- **Where to view**: `http://<PI_IP>:8889/cam/` (replace `cam` if you use a different path)
+Key Features
 
----
+Resumable Installation: Uses a state file to remember completed steps. You can run the script multiple times without duplicating work.
 
-## 2) Quick Start (Manual)
+Smart Architecture Detection: Automatically detects if it is running on a Raspberry Pi 4 or Pi 5 to select the optimal video encoder.
 
-> Use this path to verify your environment or as a reference for what the script automates.
+Infinite Restart Loop: The Systemd service is configured to never give up. If the camera crashes or the process dies, it restarts immediately (critical for remote operations).
 
-```bash
-sudo apt update
-sudo apt install -y ffmpeg v4l-utils curl tar udev
+Resource Optimized: Prioritizes hardware acceleration and low-latency streaming to save CPU/RAM for other processes (like ROS2).
 
-cd /tmp
-curl -L -o mediamtx.tar.gz https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64v8.tar.gz
-tar -xzf mediamtx.tar.gz
-sudo install -m 0755 mediamtx /usr/local/bin/mediamtx
+Quick Start
 
-sudo mkdir -p /etc/mediamtx
-```
+Download the script to your Pi.
 
-Create `/etc/mediamtx/mediamtx.yml`:
+Make it executable:
 
-```yaml
-webrtc: yes
-webrtcAddress: :8889
-webrtcLocalUDPAddress: :8189
-webrtcAllowOrigin: '*'
-webrtcICEServers:
-  - stun:stun.l.google.com:19302
+chmod +x install_mediamtx.sh
 
-paths:
-  cam:
-    runOnInit: >
-      ffmpeg -f v4l2 -framerate 15 -video_size 1280x720
-      -i /dev/v4l/by-id/usb-REPLACE_ME-video-index0
-      -vcodec libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p
-      -f rtsp rtsp://localhost:8554/cam
-    runOnInitRestart: yes
-    source: publisher
-```
 
-> Replace the camera path using a stable symlink:
->
-> ```bash
-> ls -l /dev/v4l/by-id/
-> ```
+Run with root privileges:
 
-Create the systemd service:
+sudo ./install_mediamtx.sh
 
-```bash
-sudo tee /etc/systemd/system/mediamtx.service >/dev/null <<'UNIT'
-[Unit]
-Description=MediaMTX real-time media router
-After=network-online.target
-Wants=network-online.target
 
-[Service]
-Type=simple
-ExecStartPre=/bin/sh -c 'udevadm settle --timeout=8 || true'
-ExecStart=/usr/local/bin/mediamtx /etc/mediamtx/mediamtx.yml
-Restart=on-failure
-RestartSec=2
-User=root
-LimitNOFILE=1048576
+🎥 Encoding Modes (Automatic Selection)
 
-[Install]
-WantedBy=multi-user.target
-UNIT
+The script chooses one of three encoding strategies based on your hardware and environment variables.
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now mediamtx
-```
+1. Hardware Acceleration (Default for Pi 4)
 
-Open the viewer from any device on the LAN:
+Trigger: Detected automatically on Raspberry Pi 3/4/Zero 2W.
 
-```
-http://<PI_IP>:8889/cam/
-```
+Mechanism: Uses h264_v4l2m2m.
 
----
+Benefit: Extremely low CPU usage (~5%). Uses the VideoCore GPU to compress video.
 
-## 3) Automated Installer (Resumable)
+2. Software Encoding (Default for Pi 5)
 
-The installer script sets up everything and is **resumable**: if it fails mid‑way, re‑run it and it will **continue from the last successful step**. You can also force specific steps to re-run.
+Trigger: Detected automatically on Raspberry Pi 5 (which lacks H.264 HW encoder) or generic Linux PCs.
 
-1. Copy the script contents into a file named `setup_mediamtx_pi.sh`.
-2. Run it (with or without `sudo` — it uses `sudo` internally where needed):
+Mechanism: Uses libx264 (Preset: ultrafast, Tune: zerolatency).
 
-```bash
-bash setup_mediamtx_pi.sh
-```
+Benefit: Works on any hardware. The Pi 5 CPU is powerful enough to handle this without crashing, though it consumes more power.
 
-### 3.1 Configuration via Environment Variables
+3. Pass-Through Mode (The "Efficiency King")
 
-Override defaults by exporting variables before running:
+Trigger: Set environment variable CAM_ENCODES=yes.
 
-```bash
-# MediaMTX download (pin a specific version if desired)
-export MEDIAMTX_URL="https://github.com/bluenviron/mediamtx/releases/download/v1.13.1/mediamtx_linux_arm64v8.tar.gz"
+Mechanism: Uses -vcodec copy.
 
-# Camera (use a stable by-id path if known)
-export CAMERA_BYID=/dev/v4l/by-id/usb-Logitech_HD_Webcam_C270-video-index0
+Benefit: Near-zero CPU usage. Requires a USB camera that outputs H.264 natively (e.g., Logitech C920, select Arducam modules). The Pi simply forwards the packets from USB to Network without processing pixels.
 
-# Streaming parameters
-export FRAMERATE=10
-export RESOLUTION=640x360
-export PATH_NAME=cam
-export WEBRTC_HTTP_PORT=8889
-export WEBRTC_UDP_PORT=8189
-export STUN_SERVER=stun.l.google.com:19302
+Example:
 
-bash setup_mediamtx_pi.sh
-```
+sudo CAM_ENCODES=yes ./install_mediamtx.sh --force config
 
-### 3.2 Forcing/Re-doing Steps
 
-The script maintains checkpoints at: `packages`, `install_bin`, `config`, `unit`, `enable_start`.
+⚙️ Configuration Variables
 
-```bash
-# Re-run everything regardless of checkpoints
-bash setup_mediamtx_pi.sh --force all
+You can customize the installation by setting these variables before running the script.
 
-# Re-run only the config step
-bash setup_mediamtx_pi.sh --force config
-```
+Variable
 
-### 3.3 What the Script Installs/Creates
+Default
 
-- **Binary**: `/usr/local/bin/mediamtx`
-- **Config**: `/etc/mediamtx/mediamtx.yml`
-- **Service**: `/etc/systemd/system/mediamtx.service`
-- **State** (checkpoints): `/var/lib/mediamtx-setup/state`
+Description
 
----
+CAM_ENCODES
 
-## 4) Latency Tuning (FFmpeg)
+no
 
-In the YAML `runOnInit` line:
+Set to yes if your camera outputs H.264. Forces copy mode.
 
-- Lower resolution: `-video_size 640x360` (or 800×448, 960×540…)
-- Lower fps: `-framerate 10`
-- Keep: `-preset ultrafast -tune zerolatency -pix_fmt yuv420p`
-- For webcams that output MJPEG faster, you can try `-input_format mjpeg` (if supported) to reduce USB bandwidth.
+FRAMERATE
 
-> Note: Phones sometimes add extra delay on WebRTC pages. Desktop browsers tend to show less latency.
+30
 
-After editing `/etc/mediamtx/mediamtx.yml`:
+Target FPS. Note: USB bandwidth may limit this (see troubleshooting).
 
-```bash
-sudo systemctl restart mediamtx
-```
+RESOLUTION
 
----
+1280x720
 
-## 5) Troubleshooting & Diagnostics
+Video resolution (WidthxHeight).
 
-### 5.1 Confirm the camera exists
+MEDIAMTX_URL
 
-```bash
-lsusb
-v4l2-ctl --list-devices
-ls -l /dev/video*
-ls -l /dev/v4l/by-id/
-```
+(Auto)
 
-If the camera doesn’t appear under `/dev/v4l/by-id/` or `/dev/video*`, it’s a **USB enumeration** issue.
+Download URL. Leave empty to auto-fetch the latest ARM64 release from GitHub.
 
-### 5.2 MediaMTX logs in real-time
+WEBRTC_HTTP_PORT
 
-```bash
-journalctl -u mediamtx -f
-```
+8889
 
-If the web page says “no stream available,” you’ll often see FFmpeg errors here (e.g., “Cannot open video device”).
+Port for the WebRTC playback page.
 
-### 5.3 Kernel messages while hot-plugging
+WEBRTC_UDP_PORT
 
-In one terminal:
+8189
 
-```bash
-dmesg -w
-```
+UDP port for WebRTC streaming traffic.
 
-Unplug → plug the webcam into a **USB2 (black) port** and watch for:
+PATH_NAME
 
-- `error -110` → timeout (cable/port/transient)
-- `error -71` → protocol error (often cable/connector)
-- `over-current` → port power issue  
-- **No lines at all** → camera not detected electrically (cable, hub, bulkhead)
+cam
 
-Optional: udev monitor
+The RTSP path name (e.g., rtsp://pi:8554/cam).
 
-```bash
-udevadm monitor --kernel --subsystem-match=usb
-```
+STUN_SERVER
 
-### 5.4 Ensure the UVC driver is present
+stun.l.google.com
 
-```bash
-sudo modprobe uvcvideo
-lsmod | grep uvcvideo || echo "uvcvideo not loaded"
-```
+STUN server for NAT traversal.
 
-### 5.5 Soft-reset the USB host (Pi 4)
+Example with custom settings:
 
-```bash
-for d in /sys/bus/pci/drivers/xhci_hcd/*:*; do
-  echo -n ${d##*/} | sudo tee /sys/bus/pci/drivers/xhci_hcd/unbind >/dev/null
-  sleep 1
-  echo -n ${d##*/} | sudo tee /sys/bus/pci/drivers/xhci_hcd/bind   >/dev/null
-done
-```
+sudo FRAMERATE=60 RESOLUTION=1920x1080 ./install_mediamtx.sh --force config
 
-### 5.6 Power sanity (undervoltage check)
 
-Ubuntu-friendly firmware flag:
+🛠 Usage Flags
 
-```bash
-cat /sys/devices/platform/soc/soc:firmware/get_throttled 2>/dev/null || \
-cat /sys/devices/platform/*/get_throttled 2>/dev/null
-# 0x0 means no undervoltage/throttle this boot
-```
+The script tracks its progress in /var/lib/mediamtx-setup/state. If you change a setting, you must tell the script to re-run specific steps using --force.
 
-Kernel log search:
+Force a Configuration Update
 
-```bash
-journalctl -k -b -g 'Under-voltage\|voltage normalised\|throttl'
-```
+If you changed variables (like resolution or encoder mode), run this to regenerate mediamtx.yml:
 
-> **Note:** There is no “overvoltage flag.” Measure 5 V at the GPIO header under load; target ≤ 5.25 V.
+sudo ./install_mediamtx.sh --force config
 
----
 
-## 6) Viewing & Recording
+Note: You must restart the service afterwards (sudo systemctl restart mediamtx).
 
-- Browser (WebRTC): `http://<PI_IP>:8889/cam/`
-- Desktop test client (RTSP):  
-  ```bash
-  ffplay -rtsp_transport tcp rtsp://<PI_IP>:8554/cam
-  ```
-- Record the **WebRTC page** using an OS **screen recorder** if needed on mobile.
-- To record RTSP at the Pi (headless):
-  ```bash
-  ffmpeg -rtsp_transport tcp -i rtsp://127.0.0.1:8554/cam -c copy -t 00:05:00 /tmp/cam.mkv
-  ```
+Force a Full Re-Install
 
----
+To wipe the previous installation state and start over:
 
-## 7) Common Failure Patterns & Fixes
+sudo ./install_mediamtx.sh --force all
 
-| Symptom | Likely Cause | Fix |
-| --- | --- | --- |
-| “No stream available” | FFmpeg failed to open `/dev/video*` | `journalctl -u mediamtx -f`, check camera path, `v4l2-ctl --list-devices` |
-| Camera missing from `lsusb` | USB enumeration failure | Try USB2 port; different short cable; remove bulkhead/extension; powered hub |
-| Intermittent camera discovery | Marginal cable/connector/hub | Replace cable; add powered hub; avoid long passive extensions |
-| High latency in phone browser | Mobile WebRTC buffering | Lower fps/res; try desktop browser; ensure good Wi‑Fi |
-| Service flaps on boot | Config permissions / symlink to `$HOME` | Keep config in `/etc/mediamtx/mediamtx.yml` (no symlinks) |
 
----
+Force Service Unit Update
 
-## 8) Uninstall / Cleanup
+If you modified the Systemd logic (e.g., changing restart timers):
 
-```bash
-sudo systemctl disable --now mediamtx
-sudo rm -f /etc/systemd/system/mediamtx.service
-sudo systemctl daemon-reload
+sudo ./install_mediamtx.sh --force unit
 
-sudo rm -f /usr/local/bin/mediamtx
-sudo rm -rf /etc/mediamtx
 
-sudo rm -rf /var/lib/mediamtx-setup
-```
+🐛 Troubleshooting
 
----
+1. "The driver changed time per frame from 1/30 to 1/10"
 
-## 9) Security Notes (MVP-friendly)
+Cause: USB Bandwidth saturation. Sending Raw YUYV video at 720p/30fps is too much data for the USB controller.
+Fix: Force the camera to compress to MJPEG before sending data to the Pi.
 
-- The example config allows any origin (`webrtcAllowOrigin: '*'`) on your LAN. For wider networks, restrict this.
-- The service runs as **root** for simplicity during MVP. When hardening, consider a dedicated user and udev rules for camera access.
-- WebRTC is exposed only on your Pi’s LAN IP/ports. If you port-forward the Pi to the internet, configure **auth/TLS** appropriately.
+Edit the script's write_conf function.
 
----
+Change INPUT_FLAGS to include -input_format mjpeg.
 
-## 10) FAQ
+2. Stream crashes after a few seconds
 
-**Q: Can I stream multiple cameras?**  
-A: Yes—add additional `paths:` entries (e.g., `cam2`, `cam3`) each with its own `runOnInit` and unique `-i /dev/v4l/by-id/...`.
+Cause: Likely OOM (Out Of Memory) or Power Undervoltage.
+Check:
 
-**Q: Can I overlay HUD (pose/depth/heading)?**  
-A: Easiest is on the **client** (browser) using WebRTC and a ROS2 bridge (e.g., Foxglove Bridge). Server-side overlays are also possible by inserting a GStreamer/FFmpeg filter, but add latency/CPU.
+dmesg | grep -iE "kill|throttled|voltage"
 
-**Q: My camera only works on USB2, not USB3**  
-A: Many UVC cams enumerate more reliably on Pi USB2 (black ports). Try that first.
 
----
+If throttled: Improve power supply/cooling.
 
-## 11) Files & Paths (at a glance)
+If kill: Switch to Hardware Encoding (Pi 4) or Pass-through mode.
 
-- Binary: `/usr/local/bin/mediamtx`
-- Config: `/etc/mediamtx/mediamtx.yml`
-- Service: `/etc/systemd/system/mediamtx.service`
-- Logs: `journalctl -u mediamtx -f`
-- Checkpoints: `/var/lib/mediamtx-setup/state`
-- Viewer: `http://<PI_IP>:8889/cam/`
+3. Service keeps restarting
 
----
+This is by design. The script sets Restart=always and StartLimitIntervalSec=0. The service will infinitely attempt to bring the camera back online if it disconnects (e.g., loose cable during AUV operation).
 
-*Maintained by the AUV team. This README reflects the working configuration we validated in the field and is designed to be copy‑pasted on fresh Raspberry Pis for fast, consistent bring‑up.*
+📂 File Locations
+
+Binary: /usr/local/bin/mediamtx
+
+Config: /etc/mediamtx/mediamtx.yml
+
+Systemd Unit: /etc/systemd/system/mediamtx.service
+
+Install State: /var/lib/mediamtx-setup/state

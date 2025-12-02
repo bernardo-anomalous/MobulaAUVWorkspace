@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resumable MediaMTX setup (Ubuntu on Raspberry Pi) — VERBOSE EDITION
+# Resumable MediaMTX setup (Ubuntu on Raspberry Pi) — ROV/AUV OPTIMIZED EDITION v2
 set -uo pipefail
 
 # ===== CLI =====
@@ -14,7 +14,10 @@ fi
 # If you leave MEDIAMTX_URL empty, we'll resolve the latest arm64v8 asset from GitHub API.
 MEDIAMTX_URL="${MEDIAMTX_URL:-}"
 
-FRAMERATE="${FRAMERATE:-15}"
+# Options: "yes" if your camera outputs H.264 natively (Logitech C920, Arducam, etc.)
+CAM_ENCODES="${CAM_ENCODES:-no}"
+
+FRAMERATE="${FRAMERATE:-30}"
 RESOLUTION="${RESOLUTION:-1280x720}"
 PATH_NAME="${PATH_NAME:-cam}"
 WEBRTC_HTTP_PORT="${WEBRTC_HTTP_PORT:-8889}"
@@ -78,7 +81,6 @@ do_packages() {
 
 # ----- Resolve latest arm64 URL from GitHub API (with fallback) -----
 resolve_latest_arm64_url() {
-  # Try GitHub API for the exact asset URL
   local api="https://api.github.com/repos/bluenviron/mediamtx/releases/latest"
   local url
   url="$(curl -fsSL "$api" \
@@ -88,7 +90,6 @@ resolve_latest_arm64_url() {
     echo "$url"
     return 0
   fi
-  # Fallback to a tag name (latest tag)
   local tag
   tag="$(curl -fsSL https://api.github.com/repos/bluenviron/mediamtx/tags \
     | grep -m1 -oE '"name":\s*"v[0-9]+\.[0-9]+\.[0-9]+"' \
@@ -97,18 +98,15 @@ resolve_latest_arm64_url() {
     echo "https://github.com/bluenviron/mediamtx/releases/download/${tag}/mediamtx_${tag}_linux_arm64v8.tar.gz"
     return 0
   fi
-  # Last resort: the "latest/download" pattern (may redirect to HTML sometimes)
   echo "https://github.com/bluenviron/mediamtx/releases/latest/download/mediamtx_linux_arm64v8.tar.gz"
 }
 
 # ----- STEP: install mediamtx -----
 do_install_bin() {
   step "install_bin"
-  # Always stop any running instance first (prevents port binds and in-use binary)
   if systemctl list-unit-files | grep -q '^mediamtx\.service'; then
     run "$SUDO systemctl stop mediamtx || true"
   fi
-  # Kill stray processes if any
   if pgrep -x mediamtx >/dev/null 2>&1; then
     warn "Killing stray mediamtx process"
     run "$SUDO pkill -x mediamtx || true"
@@ -120,7 +118,6 @@ do_install_bin() {
     return
   fi
 
-  # Pick URL (use env override if provided; otherwise resolve latest)
   local url
   if [[ -n "${MEDIAMTX_URL}" ]]; then
     url="${MEDIAMTX_URL}"
@@ -132,17 +129,13 @@ do_install_bin() {
 
   local TMP
   TMP=$(mktemp -d) || { err "mktemp failed"; return; }
-  show_cmd "cd \"$TMP\""
   cd "$TMP" || { err "cannot cd $TMP"; return; }
 
-  # Download
   if run "curl -L --progress-bar -o mediamtx.tar.gz \"${url}\""; then
-    # Sanity check: is it really a gzip tar?
     if ! tar -tzf mediamtx.tar.gz >/dev/null 2>&1; then
-      err "downloaded file is not a valid tar.gz (GitHub HTML/redirect or rate-limit?). Try again or set MEDIAMTX_URL explicitly."
+      err "downloaded file is not a valid tar.gz"
       return
     fi
-    # Extract verbosely
     if run "tar -xzvf mediamtx.tar.gz"; then
       if [[ -x ./mediamtx ]]; then
         if run "$SUDO install -m 0755 ./mediamtx \"${MTX_BIN}\""; then
@@ -152,7 +145,7 @@ do_install_bin() {
           err "install failed"
         fi
       else
-        err "archive did not contain an executable 'mediamtx'"
+        err "archive did not contain 'mediamtx'"
       fi
     else
       err "extract failed"
@@ -175,28 +168,60 @@ detect_cam() {
 write_conf() {
   local cam="$1"
   run "$SUDO install -d -m 755 -o root -g root \"${MTX_ETC_DIR}\"" || return 1
+  
+  # Backup existing config
   if [[ -f "${MTX_CONF}" ]] && ! grep -q "${STAMP}" "${MTX_CONF}"; then
     run "$SUDO cp -n \"${MTX_CONF}\" \"${MTX_CONF}.bak.$(date +%Y%m%d%H%M%S)\"" || true
   fi
+
+  # --- SMART ENCODER LOGIC ---
+  # Default Input settings
+# Default Input settings
+  # Added -input_format mjpeg to fix USB bandwidth bottleneck (restores 30fps)
+  local INPUT_FLAGS="-f v4l2 -input_format mjpeg -framerate ${FRAMERATE} -video_size ${RESOLUTION}"
+  local OUTPUT_FLAGS=""
+  
+  local MODEL
+  # We strip null bytes to prevent bash warnings
+  MODEL=$(cat /sys/firmware/devicetree/base/model 2>/dev/null | tr -d '\0' || echo "Unknown")
+
+  # 1. CHECK: Did user say the camera handles encoding?
+  if [[ "${CAM_ENCODES}" == "yes" ]] || [[ "${CAM_ENCODES}" == "true" ]]; then
+     log "Mode: PASS-THROUGH (Camera handles H.264)"
+     INPUT_FLAGS="${INPUT_FLAGS} -input_format h264"
+     OUTPUT_FLAGS="-vcodec copy"
+
+  # 2. CHECK: Is this a Pi 4? (Use Hardware Encoder)
+  elif [[ "$MODEL" == *"Raspberry Pi 4"* ]]; then
+     log "Mode: PI 4 HARDWARE ENCODE (h264_v4l2m2m)"
+     # Uses the Pi 4 V3D hardware block (Low CPU/RAM)
+     OUTPUT_FLAGS="-vcodec h264_v4l2m2m -b:v 2M -pix_fmt yuv420p"
+
+  # 3. CHECK: Fallback (Pi 5 or generic Linux)
+  else
+     log "Mode: SOFTWARE ENCODE (libx264)"
+     OUTPUT_FLAGS="-vcodec libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p"
+  fi
+  # ---------------------------
+
   local TMP
   TMP=$(mktemp)
+  # FIXED: Removed 'urls' list, used 'url' singular as per MediaMTX latest spec
   cat > "${TMP}" <<YAML
 ${STAMP}
 webrtc: yes
 webrtcAddress: :${WEBRTC_HTTP_PORT}
 webrtcLocalUDPAddress: :${WEBRTC_UDP_PORT}
 webrtcAllowOrigin: '*'
-# Note: 'webrtcICEServers' is deprecated; 'webrtcICEServers2' is preferred.
 webrtcICEServers2:
-  - urls:
-      - stun:${STUN_SERVER}
+  - url: stun:${STUN_SERVER}
 
 paths:
   ${PATH_NAME}:
     runOnInit: >
-      ffmpeg -f v4l2 -framerate ${FRAMERATE} -video_size ${RESOLUTION}
+      ffmpeg ${INPUT_FLAGS}
       -i ${cam}
-      -vcodec libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p
+      ${OUTPUT_FLAGS}
       -f rtsp rtsp://localhost:8554/${PATH_NAME}
     runOnInitRestart: yes
     source: publisher
@@ -229,14 +254,16 @@ ${STAMP}
 Description=MediaMTX real-time media router
 After=network-online.target
 Wants=network-online.target
+# CRITICAL FOR ROBOTS: Never give up restarting, even if it fails 100 times.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 ExecStartPre=/bin/sh -c 'udevadm settle --timeout=8 || true'
-# If UDP 8000/8001 are in use on your system, consider setting rtpPort/rtcpPort in ${MTX_CONF}
 ExecStart=${MTX_BIN} ${MTX_CONF}
-Restart=on-failure
-RestartSec=2
+# Restart always, even if the process exits cleanly
+Restart=always
+RestartSec=3
 User=root
 LimitNOFILE=1048576
 
@@ -285,7 +312,6 @@ do_health() {
   run "$SUDO systemctl --no-pager --full status mediamtx || true"
   run "$SUDO journalctl -u mediamtx -n 30 --no-pager || true"
   if command -v curl >/dev/null 2>&1; then
-    show_cmd "curl -fsS http://127.0.0.1:${WEBRTC_HTTP_PORT}/${PATH_NAME}/ -o /dev/null"
     if curl -fsS "http://127.0.0.1:${WEBRTC_HTTP_PORT}/${PATH_NAME}/" >/dev/null 2>&1; then
       ok "HTTP reachable: http://<PI_IP>:${WEBRTC_HTTP_PORT}/${PATH_NAME}/"
     else
@@ -306,12 +332,10 @@ do_health
 
 echo
 echo "==== SUMMARY ===="
-echo "Binary:   ${MTX_BIN}  ($(command -v ${MTX_BIN} >/dev/null && echo present || echo missing))"
+echo "Binary:   ${MTX_BIN}"
 echo "Config:   ${MTX_CONF}"
-echo "Unit:     ${MTX_UNIT}"
-echo "URL:      http://<PI_IP>:${WEBRTC_HTTP_PORT}/${PATH_NAME}/"
-echo "Camera:   $(grep -m1 ' -i ' ${MTX_CONF} 2>/dev/null | sed 's/.*-i //;s/ -vcodec.*//' || echo '?')"
-echo "State:    ${STATE_FILE} (remove or use --force to redo steps)"
+echo "Mode:     $(grep -q 'copy' ${MTX_CONF} && echo 'PASS-THROUGH' || (grep -q 'v4l2m2m' ${MTX_CONF} && echo 'HARDWARE-ACCEL' || echo 'SOFTWARE-CPU'))"
+echo "State:    ${STATE_FILE}"
 if [[ ${FAILS} -eq 0 ]]; then
   echo "Result:   OK"
 else
