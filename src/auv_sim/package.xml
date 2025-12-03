@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>auv_sim</name>
+  <version>0.0.0</version>
+  <description>Portable simulator nodes that mimic AUV telemetry for GUI development.</description>
+
+  <maintainer email="dev@mobula.local">Mobula AUV Team</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>auv_custom_interfaces</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+</package>
