@@ -17,7 +17,7 @@ from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import String
 
-# --- RESTORED: Import your custom utility to ensure heading matches reality ---
+# --- RESTORED: Import your custom utility ---
 from .utils import quaternion_to_euler
 
 # --- Hardware Imports ---
@@ -40,7 +40,7 @@ from adafruit_bno08x import (
     BNO_REPORT_ROTATION_VECTOR,
 )
 
-# --- Math Utilities (Kept local for the Prediction Logic) ---
+# --- Math Utilities (Local for Prediction) ---
 def q_normalize(q):
     x, y, z, w = q
     n = math.sqrt(x*x + y*y + z*z + w*w)
@@ -78,14 +78,17 @@ class ThreadedIMUNode(Node):
         self.bus_id = int(self.get_parameter('i2c_bus_id').value)
         self.addr = int(self.get_parameter('i2c_address').value)
         
-        # Publish Rate (ROS side) - 60Hz for smooth PIDs
+        # Publish Rate (60Hz for PIDs)
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
         
-        # Poll Rate (Hardware side) - 25Hz to be safe on bitbang bus
+        # Hardware Poll Rate (25Hz for Bitbang safety)
         self.sensor_poll_rate = 25.0 
 
-        self.heading_offset = -30.0
+        # --- CALIBRATED OFFSET ---
+        # Adjusted from -30.0 to 224.5 to fix the 312 vs 57.5 discrepancy
+        self.declare_parameter('heading_offset', 224.5)
+        self.heading_offset = float(self.get_parameter('heading_offset').value)
         
         # --- Publishers ---
         self.imu_publisher_ = self.create_publisher(Imu, 'imu/data', 10)
@@ -114,7 +117,7 @@ class ThreadedIMUNode(Node):
 
         self.timer = self.create_timer(1.0/self.publish_rate, self.publish_cycle)
         
-        self.get_logger().info(f"IMU Node started. Pub rate: {self.publish_rate}Hz")
+        self.get_logger().info(f"IMU Node started. Offset: {self.heading_offset}")
 
     def setup_sensor(self):
         try:
@@ -129,23 +132,19 @@ class ThreadedIMUNode(Node):
 
             self.bno = BNO08X_I2C(self.i2c, address=self.addr)
             
-            # --- FIX: FIXED ARGUMENTS & RATE ---
-            # We enable at default rate (matches your working logic)
+            # Enable features (Default Rate)
             self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
             self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
             self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
             
             self.sensor_ready = True
-            self.get_logger().info("BNO085 Initialized successfully.")
+            self.get_logger().info("BNO085 Initialized.")
             
         except Exception as e:
             self.get_logger().error(f"Sensor Setup Failed: {e}")
             self.sensor_ready = False
 
     def read_loop(self):
-        """
-        Background thread that polls the slow I2C bus.
-        """
         while self.running and rclpy.ok():
             if not self.sensor_ready:
                 time.sleep(1.0)
@@ -153,7 +152,7 @@ class ThreadedIMUNode(Node):
                 continue
             
             try:
-                # BLOCKS here on slow I2C
+                # BLOCKS on slow I2C
                 qi, qj, qk, qr = self.bno.quaternion
                 ax, ay, az = self.bno.acceleration
                 gx, gy, gz = self.bno.gyro
@@ -171,13 +170,9 @@ class ThreadedIMUNode(Node):
                 self.get_logger().warn(f"I2C Read Error: {e}")
                 time.sleep(0.1)
 
-            # Small sleep to yield CPU
             time.sleep(0.01)
 
     def publish_cycle(self):
-        """
-        High frequency (60Hz) publish loop for PIDs
-        """
         now = time.monotonic()
         
         with self.lock:
@@ -188,7 +183,7 @@ class ThreadedIMUNode(Node):
             is_fresh = self.new_hw_data_available
             if is_fresh: self.new_hw_data_available = False
 
-        # Gyro Prediction Fallback (prevents staircase effect)
+        # Prediction
         dt = now - last_time
         
         if dt > 1.0:
@@ -197,7 +192,6 @@ class ThreadedIMUNode(Node):
             
         self.health_pub.publish(String(data="OK"))
 
-        # Predict current orientation based on last known gyro rate
         dq = quat_from_gyro(hw_gyro[0], hw_gyro[1], hw_gyro[2], dt)
         predicted_q = q_normalize(q_mul(hw_q, dq))
         
@@ -218,19 +212,18 @@ class ThreadedIMUNode(Node):
         msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z = accel
         self.imu_publisher_.publish(msg)
 
-        # 2. Euler Msg - USING YOUR UTILS
-        # This ensures the RPY matches exactly what you had before
+        # 2. Euler Msg (USING YOUR UTILS)
         roll, pitch, yaw = quaternion_to_euler(*q)
         
         vec = Vector3()
         vec.x = roll; vec.y = pitch; vec.z = yaw
         self.rpy_publisher_.publish(vec)
         
-        # 3. Heading Msg - USING YOUR MATH
+        # 3. Heading Msg (Calibrated)
         heading_degrees = (-yaw + self.heading_offset + 360) % 360
         cardinal = self.yaw_to_cardinal(heading_degrees)
         
-        # String format matches your GUI
+        # Exact format for GUI
         heading_str = f'Heading: {cardinal}, {heading_degrees:.2f} degrees'
         
         self.heading_publisher_.publish(String(data=heading_str))
