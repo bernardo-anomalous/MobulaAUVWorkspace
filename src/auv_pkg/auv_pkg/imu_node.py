@@ -17,7 +17,7 @@ from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import String
 
-# --- RESTORED: Import your custom utility ---
+# --- IMPORT YOUR UTILS (Crucial for correct heading) ---
 from .utils import quaternion_to_euler
 
 # --- Hardware Imports ---
@@ -40,7 +40,7 @@ from adafruit_bno08x import (
     BNO_REPORT_ROTATION_VECTOR,
 )
 
-# --- Math Utilities (Local for Prediction) ---
+# --- Math Utilities (Local for Prediction only) ---
 def q_normalize(q):
     x, y, z, w = q
     n = math.sqrt(x*x + y*y + z*z + w*w)
@@ -68,7 +68,7 @@ def quat_from_gyro(gx, gy, gz, dt):
     return (gx*s, gy*s, gz*s, math.cos(half))
 
 
-class ThreadedIMUNode(Node):
+class ImmortalIMUNode(Node):
     def __init__(self):
         super().__init__('imu_node')
 
@@ -78,53 +78,73 @@ class ThreadedIMUNode(Node):
         self.bus_id = int(self.get_parameter('i2c_bus_id').value)
         self.addr = int(self.get_parameter('i2c_address').value)
         
-        # Publish Rate (60Hz for PIDs)
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
         
-        # Hardware Poll Rate (25Hz for Bitbang safety)
-        self.sensor_poll_rate = 25.0 
-
-        # --- CALIBRATED OFFSET ---
-        # Adjusted from -30.0 to 224.5 to fix the 312 vs 57.5 discrepancy
-        self.declare_parameter('heading_offset', 253.5)
-        self.heading_offset = float(self.get_parameter('heading_offset').value)
+        # This matches your old logic (-30 offset)
+        self.declare_parameter('mounting_offset_deg', 224.5) # Use the calibrated value we found
+        self.mounting_offset_deg = float(self.get_parameter('mounting_offset_deg').value)
         
         # --- Publishers ---
         self.imu_publisher_ = self.create_publisher(Imu, 'imu/data', 10)
         self.rpy_publisher_ = self.create_publisher(Vector3, 'imu/euler', 10)
         self.heading_publisher_ = self.create_publisher(String, 'imu/heading', 10)
-        self.health_pub = self.create_publisher(String, 'imu/health', 10)
+        
+        # QoS for health (latched)
+        health_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.health_pub = self.create_publisher(String, 'imu/health_status', health_qos)
 
-        # --- State Variables ---
+        # --- State ---
         self.lock = threading.Lock()
         self.running = True
         self.sensor_ready = False
         
+        # The "Truth"
         self.last_hw_q = (0.0, 0.0, 0.0, 1.0)
         self.last_hw_gyro = (0.0, 0.0, 0.0)
         self.last_hw_accel = (0.0, 0.0, 0.0)
         self.last_hw_time = time.monotonic()
         self.new_hw_data_available = False
 
+        # Hardware Objects
         self.i2c = None
         self.bno = None
-        self.setup_sensor()
 
-        # --- Threads & Timers ---
+        # --- Threads ---
+        # 1. Background Reader (The "Miner" - Digs for data, Handles collapses)
         self.read_thread = threading.Thread(target=self.read_loop, daemon=True)
         self.read_thread.start()
 
+        # 2. Fast Publisher (The "Broadcast" - Sends smooth data to PIDs)
         self.timer = self.create_timer(1.0/self.publish_rate, self.publish_cycle)
         
-        self.get_logger().info(f"IMU Node started. Offset: {self.heading_offset}")
+        self.get_logger().info(f"Immortal IMU Node started. Pub: {self.publish_rate}Hz")
 
-    def setup_sensor(self):
+    def hard_reset_i2c(self):
+        """
+        The Nuclear Option: Destroys the I2C object and recreates it.
+        This fixes [Errno 6] No such device.
+        """
+        with self.lock:
+            self.sensor_ready = False
+        
+        self.get_logger().warn("Performing Hard I2C Reset...")
+        
+        # 1. Teardown
         try:
-            if self.i2c: 
+            if self.i2c:
                 try: self.i2c.deinit()
                 except: pass
-            
+                try: self.i2c.close()
+                except: pass
+        except: pass
+        
+        self.i2c = None
+        self.bno = None
+        time.sleep(0.5) # Let the bus breathe
+
+        # 2. Rebuild
+        try:
             if _HAS_EXTENDED_I2C:
                 self.i2c = ExtendedI2C(self.bus_id)
             else:
@@ -132,47 +152,75 @@ class ThreadedIMUNode(Node):
 
             self.bno = BNO08X_I2C(self.i2c, address=self.addr)
             
-            # Enable features (Default Rate)
+            # Enable Features (No args, fixes TypeError)
             self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
             self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
             self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
             
-            self.sensor_ready = True
-            self.get_logger().info("BNO085 Initialized.")
+            with self.lock:
+                self.sensor_ready = True
             
+            self.get_logger().info("I2C Bus Recovered & Sensor Re-enabled.")
+            self.health_pub.publish(String(data="IMU OK"))
+            return True
+
         except Exception as e:
-            self.get_logger().error(f"Sensor Setup Failed: {e}")
-            self.sensor_ready = False
+            self.get_logger().error(f"Reset Failed: {e}")
+            return False
 
     def read_loop(self):
+        """
+        The Supervisor Thread. It tries to read. If it fails, it fixes the bus.
+        """
+        # Initial Setup
+        while self.running and not self.sensor_ready:
+            if self.hard_reset_i2c(): break
+            time.sleep(1.0)
+
         while self.running and rclpy.ok():
-            if not self.sensor_ready:
-                time.sleep(1.0)
-                self.setup_sensor()
-                continue
-            
             try:
-                # BLOCKS on slow I2C
+                # --- READ ATTEMPT ---
+                # This blocks on I2C. If the bus dies, this throws an exception.
                 qi, qj, qk, qr = self.bno.quaternion
                 ax, ay, az = self.bno.acceleration
                 gx, gy, gz = self.bno.gyro
 
                 now = time.monotonic()
                 
+                # Update State safely
                 with self.lock:
                     self.last_hw_q = q_normalize((qi, qj, qk, qr))
                     self.last_hw_accel = (ax, ay, az)
                     self.last_hw_gyro = (gx, gy, gz)
                     self.last_hw_time = now
                     self.new_hw_data_available = True
-            
-            except Exception as e:
-                self.get_logger().warn(f"I2C Read Error: {e}")
-                time.sleep(0.1)
+                    self.sensor_ready = True
 
-            time.sleep(0.01)
+                # Tiny sleep to yield CPU
+                time.sleep(0.01)
+
+            except Exception as e:
+                # --- FAILURE DETECTED ---
+                error_str = str(e)
+                self.get_logger().warn(f"Read Error: {error_str}")
+                self.health_pub.publish(String(data=f"IMU ERROR: {error_str}"))
+                
+                # Check for critical errors that require a Reset
+                critical = ["Errno 6", "No such device", "Remote I/O", "255", "Unprocessable"]
+                
+                if any(c in error_str for c in critical) or isinstance(e, OSError):
+                    self.get_logger().error("Critical Bus Failure detected. Initiating Recovery...")
+                    
+                    # Loop until we fix it or shutting down
+                    while self.running and rclpy.ok():
+                        if self.hard_reset_i2c():
+                            break # We are back!
+                        time.sleep(1.0) # Wait before retry
 
     def publish_cycle(self):
+        """
+        Runs at 60Hz. Even during a reset, this keeps publishing (using prediction/fallback).
+        """
         now = time.monotonic()
         
         with self.lock:
@@ -180,29 +228,36 @@ class ThreadedIMUNode(Node):
             hw_gyro = self.last_hw_gyro
             hw_accel = self.last_hw_accel
             last_time = self.last_hw_time
+            is_ready = self.sensor_ready
             is_fresh = self.new_hw_data_available
             if is_fresh: self.new_hw_data_available = False
 
-        # Prediction
+        # Calculate time delta
         dt = now - last_time
         
-        if dt > 1.0:
-            self.health_pub.publish(String(data="STALE"))
-            return 
-            
-        self.health_pub.publish(String(data="OK"))
+        # If the sensor has been dead for > 2 seconds, stop predicting (safety)
+        if dt > 2.0:
+            if not is_ready:
+                self.health_pub.publish(String(data="IMU RECOVERING"))
+            else:
+                self.health_pub.publish(String(data="IMU TIMEOUT"))
+            # We still publish the last known quaternion to keep nodes from crashing,
+            # but we zero the gyro so the robot stops "spinning" in its head.
+            hw_gyro = (0.0, 0.0, 0.0)
 
+        # PREDICTION LOGIC (Gyro Integration)
+        # This keeps the motion smooth even if I2C is stuttering or resetting
         dq = quat_from_gyro(hw_gyro[0], hw_gyro[1], hw_gyro[2], dt)
         predicted_q = q_normalize(q_mul(hw_q, dq))
         
-        self.publish_ros_msgs(predicted_q, hw_gyro, hw_accel, now)
+        self.publish_ros_msgs(predicted_q, hw_gyro, hw_accel)
 
     def yaw_to_cardinal(self, heading_degrees):
         directions = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West']
         index = round(heading_degrees / 45.0) % 8
         return directions[index]
 
-    def publish_ros_msgs(self, q, gyro, accel, t_now):
+    def publish_ros_msgs(self, q, gyro, accel):
         # 1. IMU Msg
         msg = Imu()
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -213,14 +268,16 @@ class ThreadedIMUNode(Node):
         self.imu_publisher_.publish(msg)
 
         # 2. Euler Msg (USING YOUR UTILS)
-        roll, pitch, yaw = quaternion_to_euler(*q)
+        roll, pitch, raw_yaw = quaternion_to_euler(*q)
         
         vec = Vector3()
-        vec.x = roll; vec.y = pitch; vec.z = yaw
+        vec.x = roll
+        vec.y = pitch
+        vec.z = raw_yaw
         self.rpy_publisher_.publish(vec)
         
         # 3. Heading Msg (Calibrated)
-        heading_degrees = (-yaw + self.heading_offset + 360) % 360
+        heading_degrees = (-raw_yaw + self.mounting_offset_deg + 360) % 360
         cardinal = self.yaw_to_cardinal(heading_degrees)
         
         # Exact format for GUI
@@ -230,7 +287,7 @@ class ThreadedIMUNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ThreadedIMUNode()
+    node = ImmortalIMUNode()
     executor = MultiThreadedExecutor()
     executor.add_node(node)
     
