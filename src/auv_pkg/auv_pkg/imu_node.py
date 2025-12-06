@@ -27,7 +27,6 @@ except Exception:
 try:
     import board
     import busio
-    # import bitbangio # Uncomment if you need explicit bitbangio
 except Exception:
     pass
 
@@ -95,9 +94,6 @@ class ThreadedIMUNode(Node):
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
         
-        # Poll Rate (Hardware side) - 25Hz to be safe on bitbang bus
-        self.sensor_poll_rate = 25.0 
-
         self.heading_offset = -30.0
         
         # --- Publishers ---
@@ -127,7 +123,7 @@ class ThreadedIMUNode(Node):
 
         self.timer = self.create_timer(1.0/self.publish_rate, self.publish_cycle)
         
-        self.get_logger().info(f"IMU Node started. Bus poll: ~{self.sensor_poll_rate}Hz, Pub rate: {self.publish_rate}Hz")
+        self.get_logger().info(f"IMU Node started. Pub rate: {self.publish_rate}Hz")
 
     def setup_sensor(self):
         try:
@@ -142,14 +138,16 @@ class ThreadedIMUNode(Node):
 
             self.bno = BNO08X_I2C(self.i2c, address=self.addr)
             
-            # Enable features at sensor poll rate
-            report_interval = int(1000000 / self.sensor_poll_rate)
-            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR, report_interval)
-            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER, report_interval)
-            self.bno.enable_feature(BNO_REPORT_GYROSCOPE, report_interval)
+            # --- FIX: REMOVED REPORT INTERVAL ARGUMENT ---
+            # Your library version only accepts the feature ID.
+            # We rely on the sensor's default rate (usually 20Hz-50Hz)
+            # and our interpolator to smooth it out.
+            self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
             
             self.sensor_ready = True
-            self.get_logger().info("BNO085 Initialized successfully.")
+            self.get_logger().info("BNO085 Initialized successfully (Default Rate).")
             
         except Exception as e:
             self.get_logger().error(f"Sensor Setup Failed: {e}")
@@ -234,7 +232,7 @@ class ThreadedIMUNode(Node):
         heading_degrees = (-yaw + self.heading_offset + 360) % 360
         cardinal = self.yaw_to_cardinal(heading_degrees)
         
-        # This string format matches your GUI's expectation exactly:
+        # Matches your GUI requirement
         heading_str = f'Heading: {cardinal}, {heading_degrees:.2f} degrees'
         
         self.heading_publisher_.publish(String(data=heading_str))
