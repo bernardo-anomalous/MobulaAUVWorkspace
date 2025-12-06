@@ -81,7 +81,7 @@ class RobustImmortalIMU(Node):
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
         
-        self.declare_parameter('mounting_offset_deg', 129.5) 
+        self.declare_parameter('mounting_offset_deg', 0) 
         self.mounting_offset_deg = float(self.get_parameter('mounting_offset_deg').value)
         
         # --- Publishers ---
