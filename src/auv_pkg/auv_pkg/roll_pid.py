@@ -12,22 +12,19 @@ class WingRollController(Node):
     def __init__(self):
         super().__init__('Roll_PID')
 
-        # === TUNING PARAMETERS ===
-        # We keep gains relatively high for low-speed authority.
-        # The Smoothing Factor below will prevent these high gains from causing jitter at high speed.
+        # === 1. TUNING PARAMETERS ===
         self.kp_roll = 2.0  
         self.ki_roll = 0.05 
         self.kd_roll = 0.01 
 
-        # === 1. LEAKY INTEGRATOR ===
-        # 0.98 = Retain 98% of error memory. 
-        # Prevents the wings from fighting a permanent list (e.g. battery slightly off center) forever.
+        # === 2. BIOMIMETIC EFFICIENCY ===
+        # Leaky Integrator: 0.98 means "forget 2% of the error every cycle"
+        # This prevents the wings from fighting a lopsided battery forever.
         self.integrator_leak = 0.98
 
-        # === 2. OUTPUT SMOOTHING (The "Biomimetic" Filter) ===
-        # 0.0 = Raw PID (Twitchy)
-        # 0.7 = Smooth Glider (Fluid)
-        # 0.9 = Very Slow/Heavy
+        # Output Smoothing (Low Pass Filter):
+        # 0.7 means "70% previous position, 30% new command".
+        # This eats the high-frequency jitter and makes the wings "flow".
         self.output_smoothing_factor = 0.7
         self.prev_servo_left = 135.0 
         self.prev_servo_right = 135.0
@@ -40,7 +37,7 @@ class WingRollController(Node):
         self.integral_limit_roll = 20.0
         self.correction_limit_roll = 25.0
         
-        # Internal Damping
+        # Internal Damping (We keep this as is)
         self.damping_factor_roll = 0.8
         self.previous_correction_roll = 0.0
 
@@ -49,7 +46,7 @@ class WingRollController(Node):
         self.current_roll = 0.0
         self.min_angle = 90.0
         self.max_angle = 180.0
-        self.alpha = 0.8 # IMU smoothing
+        self.alpha = 0.8 
 
         # Activation flags
         self.pid_enabled = True
@@ -85,8 +82,8 @@ class WingRollController(Node):
         
         self.publish_hold_state()
 
-        # === 3. DURATION FIX ===
-        # Update rate set to 30Hz (0.033s)
+        # === 3. CRITICAL TIMING FIX ===
+        # Update rate matches Duration (30Hz = 0.033s)
         self.timer = self.create_timer(0.033, self.update_pid) 
         
         self.last_imu_time = self.get_clock().now()
@@ -96,7 +93,7 @@ class WingRollController(Node):
         self.imu_data_valid = False
         self.last_update_time = self.get_clock().now()
 
-        self.get_logger().info('Biomimetic Wing Roll Controller (Sensorless) Initialized')
+        self.get_logger().info('Biomimetic Wing Roll Controller (Optimized) Initialized')
 
     # === CALLBACKS ===
     def target_roll_callback(self, msg): self.target_roll = msg.data
@@ -192,12 +189,12 @@ class WingRollController(Node):
         # === PID CALCULATION ===
         error_roll = -(self.target_roll - self.current_roll)
         
-        # Deadband
+        # Deadband: Ignore < 1.0 degree errors to save battery
         if abs(error_roll) < 1.0: error_roll = 0.0
 
         proportional_roll = self.kp_roll * error_roll
         
-        # Leaky Integrator
+        # Leaky Integrator Logic
         self.integral_error_roll = (self.integral_error_roll * self.integrator_leak) + (error_roll * dt)
         self.integral_error_roll = max(-self.integral_limit_roll, min(self.integral_limit_roll, self.integral_error_roll))
         integral_roll = self.ki_roll * self.integral_error_roll
@@ -220,17 +217,16 @@ class WingRollController(Node):
         center_angle = 135.0
         max_correction = 50.0 
 
-        # --- IMPORTANT MIXER CHECK ---
-        # Current logic: Both wings ADD the correction.
-        # This is correct ONLY IF the servos are mechanically mirrored (inverted mounting).
-        # Meaning: Positive Signal -> Left Wing UP, Right Wing DOWN.
+        # Mixer logic preserved as verified by you
         raw_left = center_angle + (correction_roll / self.correction_limit_roll) * max_correction
         raw_right = center_angle + (correction_roll / self.correction_limit_roll) * max_correction
 
         # === OUTPUT SMOOTHING (LPF) ===
+        # This makes the servo movement "organic"
         final_left = (self.output_smoothing_factor * self.prev_servo_left) + ((1.0 - self.output_smoothing_factor) * raw_left)
         final_right = (self.output_smoothing_factor * self.prev_servo_right) + ((1.0 - self.output_smoothing_factor) * raw_right)
         
+        # Store for next cycle
         self.prev_servo_left = final_left
         self.prev_servo_right = final_right
 
@@ -241,7 +237,8 @@ class WingRollController(Node):
         command.servo_numbers = [1, 3]
         command.target_angles = [final_left, final_right]
         
-        # FIXED: Duration matches the timer (33ms)
+        # FIXED: Duration matches the loop speed (0.033s). 
+        # The servo will now move instantly, relying on our LPF code for smoothness.
         command.durations = [0.033, 0.033] 
         
         command.movement_type = "pid_control"
