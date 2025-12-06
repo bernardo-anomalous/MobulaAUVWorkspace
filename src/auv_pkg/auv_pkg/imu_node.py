@@ -87,7 +87,7 @@ class ThreadedIMUNode(Node):
 
         # --- CALIBRATED OFFSET ---
         # Adjusted from -30.0 to 224.5 to fix the 312 vs 57.5 discrepancy
-        self.declare_parameter('heading_offset', 245.5)
+        self.declare_parameter('heading_offset', 253.5)
         self.heading_offset = float(self.get_parameter('heading_offset').value)
         
         # --- Publishers ---
