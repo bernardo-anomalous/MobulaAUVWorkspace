@@ -17,7 +17,7 @@ from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import String
 
-# --- IMPORT YOUR UTILS (Crucial for correct heading) ---
+# --- RESTORED: Import your custom utility ---
 from .utils import quaternion_to_euler
 
 # --- Hardware Imports ---
@@ -40,7 +40,7 @@ from adafruit_bno08x import (
     BNO_REPORT_ROTATION_VECTOR,
 )
 
-# --- Math Utilities (Local for Prediction only) ---
+# --- Math Utilities (Local for Prediction) ---
 def q_normalize(q):
     x, y, z, w = q
     n = math.sqrt(x*x + y*y + z*z + w*w)
@@ -68,7 +68,7 @@ def quat_from_gyro(gx, gy, gz, dt):
     return (gx*s, gy*s, gz*s, math.cos(half))
 
 
-class ImmortalIMUNode(Node):
+class RobustImmortalIMU(Node):
     def __init__(self):
         super().__init__('imu_node')
 
@@ -81,8 +81,7 @@ class ImmortalIMUNode(Node):
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
         
-        # This matches your old logic (-30 offset)
-        self.declare_parameter('mounting_offset_deg', 224.5) # Use the calibrated value we found
+        self.declare_parameter('mounting_offset_deg', 224.5) 
         self.mounting_offset_deg = float(self.get_parameter('mounting_offset_deg').value)
         
         # --- Publishers ---
@@ -90,7 +89,6 @@ class ImmortalIMUNode(Node):
         self.rpy_publisher_ = self.create_publisher(Vector3, 'imu/euler', 10)
         self.heading_publisher_ = self.create_publisher(String, 'imu/heading', 10)
         
-        # QoS for health (latched)
         health_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.health_pub = self.create_publisher(String, 'imu/health_status', health_qos)
 
@@ -99,38 +97,35 @@ class ImmortalIMUNode(Node):
         self.running = True
         self.sensor_ready = False
         
-        # The "Truth"
+        # Data
         self.last_hw_q = (0.0, 0.0, 0.0, 1.0)
         self.last_hw_gyro = (0.0, 0.0, 0.0)
         self.last_hw_accel = (0.0, 0.0, 0.0)
         self.last_hw_time = time.monotonic()
         self.new_hw_data_available = False
 
+        # Error Tracking
+        self.reset_count = 0
+        self.last_error_msg = ""
+        self.CRITICAL_ERRORS = [
+            "No device", "Remote I/O", "Input/output error",
+            "Unprocessable Batch bytes", "Errno 6", "255"
+        ]
+
         # Hardware Objects
         self.i2c = None
         self.bno = None
 
         # --- Threads ---
-        # 1. Background Reader (The "Miner" - Digs for data, Handles collapses)
         self.read_thread = threading.Thread(target=self.read_loop, daemon=True)
         self.read_thread.start()
 
-        # 2. Fast Publisher (The "Broadcast" - Sends smooth data to PIDs)
         self.timer = self.create_timer(1.0/self.publish_rate, self.publish_cycle)
         
-        self.get_logger().info(f"Immortal IMU Node started. Pub: {self.publish_rate}Hz")
+        self.get_logger().info(f"Robust IMU Node Started. Offset: {self.mounting_offset_deg}")
 
-    def hard_reset_i2c(self):
-        """
-        The Nuclear Option: Destroys the I2C object and recreates it.
-        This fixes [Errno 6] No such device.
-        """
-        with self.lock:
-            self.sensor_ready = False
-        
-        self.get_logger().warn("Performing Hard I2C Reset...")
-        
-        # 1. Teardown
+    def _teardown_i2c(self):
+        """Safely kill the I2C connection"""
         try:
             if self.i2c:
                 try: self.i2c.deinit()
@@ -138,49 +133,73 @@ class ImmortalIMUNode(Node):
                 try: self.i2c.close()
                 except: pass
         except: pass
-        
         self.i2c = None
         self.bno = None
-        time.sleep(0.5) # Let the bus breathe
 
-        # 2. Rebuild
+    def _init_i2c_hardware(self):
+        """Rebuild the I2C connection and enable features"""
         try:
             if _HAS_EXTENDED_I2C:
+                self.get_logger().info(f"Connecting via ExtendedI2C on Bus {self.bus_id}...")
                 self.i2c = ExtendedI2C(self.bus_id)
             else:
+                self.get_logger().info("Connecting via Blinka BusIO...")
                 self.i2c = busio.I2C(board.SCL, board.SDA)
 
             self.bno = BNO08X_I2C(self.i2c, address=self.addr)
             
-            # Enable Features (No args, fixes TypeError)
+            # Enable Features Individually to verify them
+            self.get_logger().info("Enabling Rotation Vector...")
             self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+            
+            self.get_logger().info("Enabling Accelerometer...")
             self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+            
+            self.get_logger().info("Enabling Gyroscope...")
             self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
             
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Hardware Init Failed: {e}")
+            return False
+
+    def perform_hard_reset(self):
+        """The 'Nuclear Option' to fix Errno 6 / 255"""
+        with self.lock:
+            self.sensor_ready = False
+        
+        self.reset_count += 1
+        self.health_pub.publish(String(data=f"RESETTING ({self.reset_count})"))
+        self.get_logger().warn(f"--- PERFORMING HARD RESET #{self.reset_count} ---")
+        
+        # 1. Teardown
+        self._teardown_i2c()
+        time.sleep(0.5) # Let electrical capacitance drain / bus clear
+
+        # 2. Rebuild
+        if self._init_i2c_hardware():
             with self.lock:
                 self.sensor_ready = True
-            
-            self.get_logger().info("I2C Bus Recovered & Sensor Re-enabled.")
+            self.get_logger().info(">>> SENSOR RECOVERED <<<")
             self.health_pub.publish(String(data="IMU OK"))
             return True
-
-        except Exception as e:
-            self.get_logger().error(f"Reset Failed: {e}")
+        else:
+            self.get_logger().error("Reset Attempt Failed.")
             return False
 
     def read_loop(self):
         """
-        The Supervisor Thread. It tries to read. If it fails, it fixes the bus.
+        Background Supervisor. Reads data, catches errors, triggers resets.
         """
-        # Initial Setup
+        # Initial Startup
         while self.running and not self.sensor_ready:
-            if self.hard_reset_i2c(): break
+            if self.perform_hard_reset(): break
             time.sleep(1.0)
 
         while self.running and rclpy.ok():
             try:
                 # --- READ ATTEMPT ---
-                # This blocks on I2C. If the bus dies, this throws an exception.
+                # Blocks on I2C. Raises exception on bus failure.
                 qi, qj, qk, qr = self.bno.quaternion
                 ax, ay, az = self.bno.acceleration
                 gx, gy, gz = self.bno.gyro
@@ -196,30 +215,34 @@ class ImmortalIMUNode(Node):
                     self.new_hw_data_available = True
                     self.sensor_ready = True
 
-                # Tiny sleep to yield CPU
+                # Tiny sleep to yield CPU to the rest of the system
                 time.sleep(0.01)
 
             except Exception as e:
-                # --- FAILURE DETECTED ---
+                # --- ERROR HANDLING ---
                 error_str = str(e)
-                self.get_logger().warn(f"Read Error: {error_str}")
-                self.health_pub.publish(String(data=f"IMU ERROR: {error_str}"))
+                self.last_error_msg = error_str
                 
-                # Check for critical errors that require a Reset
-                critical = ["Errno 6", "No such device", "Remote I/O", "255", "Unprocessable"]
+                # Check for "Bus Killer" errors
+                is_critical = any(c in error_str for c in self.CRITICAL_ERRORS) or isinstance(e, OSError)
                 
-                if any(c in error_str for c in critical) or isinstance(e, OSError):
-                    self.get_logger().error("Critical Bus Failure detected. Initiating Recovery...")
+                if is_critical:
+                    self.get_logger().error(f"CRITICAL BUS FAILURE: {error_str}")
+                    self.health_pub.publish(String(data=f"CRITICAL: {error_str}"))
                     
-                    # Loop until we fix it or shutting down
+                    # Enter Recovery Loop
                     while self.running and rclpy.ok():
-                        if self.hard_reset_i2c():
-                            break # We are back!
-                        time.sleep(1.0) # Wait before retry
+                        if self.perform_hard_reset():
+                            break # Recovery Successful
+                        time.sleep(2.0) # Wait longer between failed retries
+                else:
+                    # Minor error (CRC mismatch, glitch), just warn and retry
+                    self.get_logger().warn(f"Minor Glitch: {error_str}")
+                    time.sleep(0.05) 
 
     def publish_cycle(self):
         """
-        Runs at 60Hz. Even during a reset, this keeps publishing (using prediction/fallback).
+        Runs at 60Hz. Publishes prediction if hardware is dead/resetting.
         """
         now = time.monotonic()
         
@@ -232,21 +255,17 @@ class ImmortalIMUNode(Node):
             is_fresh = self.new_hw_data_available
             if is_fresh: self.new_hw_data_available = False
 
-        # Calculate time delta
+        # Calculate time delta for prediction
         dt = now - last_time
         
-        # If the sensor has been dead for > 2 seconds, stop predicting (safety)
+        # Safety: If sensor dead > 2s, flag it, stop predicting rotation
         if dt > 2.0:
-            if not is_ready:
-                self.health_pub.publish(String(data="IMU RECOVERING"))
-            else:
-                self.health_pub.publish(String(data="IMU TIMEOUT"))
-            # We still publish the last known quaternion to keep nodes from crashing,
-            # but we zero the gyro so the robot stops "spinning" in its head.
+            status = f"STALE ({dt:.1f}s)" if is_ready else "RECOVERING"
+            self.health_pub.publish(String(data=status))
+            # Zero out gyro so we don't drift to infinity during a long reset
             hw_gyro = (0.0, 0.0, 0.0)
 
         # PREDICTION LOGIC (Gyro Integration)
-        # This keeps the motion smooth even if I2C is stuttering or resetting
         dq = quat_from_gyro(hw_gyro[0], hw_gyro[1], hw_gyro[2], dt)
         predicted_q = q_normalize(q_mul(hw_q, dq))
         
@@ -287,7 +306,7 @@ class ImmortalIMUNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = ImmortalIMUNode()
+    node = RobustImmortalIMU()
     executor = MultiThreadedExecutor()
     executor.add_node(node)
     
