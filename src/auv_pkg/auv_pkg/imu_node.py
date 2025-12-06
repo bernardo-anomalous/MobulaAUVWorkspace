@@ -17,6 +17,9 @@ from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import String
 
+# --- RESTORED: Import your custom utility to ensure heading matches reality ---
+from .utils import quaternion_to_euler
+
 # --- Hardware Imports ---
 try:
     from adafruit_extended_bus import ExtendedI2C
@@ -37,7 +40,7 @@ from adafruit_bno08x import (
     BNO_REPORT_ROTATION_VECTOR,
 )
 
-# --- Math Utilities ---
+# --- Math Utilities (Kept local for the Prediction Logic) ---
 def q_normalize(q):
     x, y, z, w = q
     n = math.sqrt(x*x + y*y + z*z + w*w)
@@ -64,21 +67,6 @@ def quat_from_gyro(gx, gy, gz, dt):
     s = math.sin(half) / omega
     return (gx*s, gy*s, gz*s, math.cos(half))
 
-def quaternion_to_euler(x, y, z, w):
-    t0 = +2.0 * (w * x + y * z)
-    t1 = +1.0 - 2.0 * (x * x + y * y)
-    roll = math.degrees(math.atan2(t0, t1))
-
-    t2 = +2.0 * (w * y - z * x)
-    t2 = max(min(t2, 1.0), -1.0)
-    pitch = math.degrees(math.asin(t2))
-
-    t3 = +2.0 * (w * z + x * y)
-    t4 = +1.0 - 2.0 * (y * y + z * z)
-    yaw = math.degrees(math.atan2(t3, t4))
-    
-    return roll, pitch, yaw
-
 
 class ThreadedIMUNode(Node):
     def __init__(self):
@@ -94,6 +82,9 @@ class ThreadedIMUNode(Node):
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
         
+        # Poll Rate (Hardware side) - 25Hz to be safe on bitbang bus
+        self.sensor_poll_rate = 25.0 
+
         self.heading_offset = -30.0
         
         # --- Publishers ---
@@ -138,22 +129,23 @@ class ThreadedIMUNode(Node):
 
             self.bno = BNO08X_I2C(self.i2c, address=self.addr)
             
-            # --- FIX: REMOVED REPORT INTERVAL ARGUMENT ---
-            # Your library version only accepts the feature ID.
-            # We rely on the sensor's default rate (usually 20Hz-50Hz)
-            # and our interpolator to smooth it out.
+            # --- FIX: FIXED ARGUMENTS & RATE ---
+            # We enable at default rate (matches your working logic)
             self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
             self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
             self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
             
             self.sensor_ready = True
-            self.get_logger().info("BNO085 Initialized successfully (Default Rate).")
+            self.get_logger().info("BNO085 Initialized successfully.")
             
         except Exception as e:
             self.get_logger().error(f"Sensor Setup Failed: {e}")
             self.sensor_ready = False
 
     def read_loop(self):
+        """
+        Background thread that polls the slow I2C bus.
+        """
         while self.running and rclpy.ok():
             if not self.sensor_ready:
                 time.sleep(1.0)
@@ -179,9 +171,13 @@ class ThreadedIMUNode(Node):
                 self.get_logger().warn(f"I2C Read Error: {e}")
                 time.sleep(0.1)
 
+            # Small sleep to yield CPU
             time.sleep(0.01)
 
     def publish_cycle(self):
+        """
+        High frequency (60Hz) publish loop for PIDs
+        """
         now = time.monotonic()
         
         with self.lock:
@@ -192,7 +188,7 @@ class ThreadedIMUNode(Node):
             is_fresh = self.new_hw_data_available
             if is_fresh: self.new_hw_data_available = False
 
-        # Gyro Prediction Fallback
+        # Gyro Prediction Fallback (prevents staircase effect)
         dt = now - last_time
         
         if dt > 1.0:
@@ -222,17 +218,19 @@ class ThreadedIMUNode(Node):
         msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z = accel
         self.imu_publisher_.publish(msg)
 
-        # 2. Euler Msg
+        # 2. Euler Msg - USING YOUR UTILS
+        # This ensures the RPY matches exactly what you had before
         roll, pitch, yaw = quaternion_to_euler(*q)
+        
         vec = Vector3()
         vec.x = roll; vec.y = pitch; vec.z = yaw
         self.rpy_publisher_.publish(vec)
         
-        # 3. Heading Msg - RESTORED ORIGINAL FORMAT
+        # 3. Heading Msg - USING YOUR MATH
         heading_degrees = (-yaw + self.heading_offset + 360) % 360
         cardinal = self.yaw_to_cardinal(heading_degrees)
         
-        # Matches your GUI requirement
+        # String format matches your GUI
         heading_str = f'Heading: {cardinal}, {heading_degrees:.2f} degrees'
         
         self.heading_publisher_.publish(String(data=heading_str))
