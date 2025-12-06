@@ -26,8 +26,13 @@ class WingRollController(Node):
         # 0.7 means "70% previous position, 30% new command".
         # This eats the high-frequency jitter and makes the wings "flow".
         self.output_smoothing_factor = 0.7
-        self.prev_servo_left = 135.0 
+        self.prev_servo_left = 135.0
         self.prev_servo_right = 135.0
+
+        self.target_input_smoothing_factor = 0.3
+        self.target_jump_reset_threshold_deg = 8.0
+        self.filtered_target_roll: Optional[float] = None
+        self.last_raw_target_roll: Optional[float] = None
 
         # PID state
         self.integral_error_roll = 0.0
@@ -96,7 +101,27 @@ class WingRollController(Node):
         self.get_logger().info('Biomimetic Wing Roll Controller (Optimized) Initialized')
 
     # === CALLBACKS ===
-    def target_roll_callback(self, msg): self.target_roll = msg.data
+    def target_roll_callback(self, msg):
+        raw_target = msg.data
+
+        if self.last_raw_target_roll is None:
+            self.last_raw_target_roll = raw_target
+            self.filtered_target_roll = raw_target
+            self.target_roll = raw_target
+            return
+
+        delta_raw_target = abs(raw_target - self.last_raw_target_roll)
+        if delta_raw_target >= self.target_jump_reset_threshold_deg:
+            self._reset_roll_filter_state()
+            self.filtered_target_roll = raw_target
+        else:
+            self.filtered_target_roll = (
+                self.target_input_smoothing_factor * raw_target
+                + (1.0 - self.target_input_smoothing_factor) * self.filtered_target_roll
+            )
+
+        self.last_raw_target_roll = raw_target
+        self.target_roll = self.filtered_target_roll
     
     def imu_callback(self, msg):
         self.current_roll = self.alpha * self.current_roll + (1 - self.alpha) * msg.x
@@ -156,6 +181,14 @@ class WingRollController(Node):
             return
         if self.local_hold_requested and error_deg <= self.release_threshold_deg:
             self._set_hold_state_from_local(False, error_deg)
+
+    def _reset_roll_filter_state(self):
+        center_angle = 135.0
+        self.prev_servo_left = center_angle
+        self.prev_servo_right = center_angle
+        self.previous_correction_roll = 0.0
+        self.integral_error_roll = 0.0
+        self.previous_error_roll = 0.0
 
     def update_pid(self):
         # Time / Safety Checks

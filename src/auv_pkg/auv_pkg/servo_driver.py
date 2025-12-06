@@ -46,8 +46,10 @@ class ServoDriverNode(LifecycleNode):
         self.pca = None
         self.servos = {}
         self.current_angles = []
-        self.angle_tolerance_deg = 0.5 
+        self.angle_tolerance_deg = 0.5
+        self.pid_angle_tolerance_deg = 0.1
         self.last_target_angles = [90.0] * 6
+        self.last_movement_types = [''] * 6
         self.stubborn = bool(self.get_parameter('stubborn').value)
 
         self.angles_publisher = None
@@ -197,6 +199,7 @@ class ServoDriverNode(LifecycleNode):
             targets_snapshot = []
             with self.target_lock:
                 targets_snapshot = list(enumerate(self.last_target_angles))
+                movement_snapshot = list(self.last_movement_types)
 
             # Hardware I/O
             for servo_number, target_angle in targets_snapshot:
@@ -214,8 +217,15 @@ class ServoDriverNode(LifecycleNode):
 
                 # Deadband Check Only (No Slew Math)
                 if current_angle is not None:
-                     if abs(current_angle - target_angle) < self.angle_tolerance_deg:
-                        continue 
+                    effective_tolerance = self.angle_tolerance_deg
+                    if (
+                        servo_number < len(movement_snapshot)
+                        and 'pid_control' in (movement_snapshot[servo_number] or '')
+                    ):
+                        effective_tolerance = self.pid_angle_tolerance_deg
+
+                    if abs(current_angle - target_angle) < effective_tolerance:
+                        continue
 
                 if not self.simulation_mode:
                     try:
@@ -488,6 +498,7 @@ class ServoDriverNode(LifecycleNode):
                         if target_angle is None or math.isnan(target_angle):
                             continue
                         self.last_target_angles[servo_number] = target_angle
+                        self.last_movement_types[servo_number] = movement_type
             
         except Exception as e:
             self.get_logger().error(f'Failed to process command: {e}')
