@@ -116,7 +116,6 @@ class RobustThreadedIMU(Node):
         self.new_hw_data_available = False
 
         self.last_health_status = None
-        self.last_health_time = 0.0
 
         self.i2c = None
         self.bno = None
@@ -176,11 +175,9 @@ class RobustThreadedIMU(Node):
             return False
 
     def _publish_health(self, status):
-        now = time.monotonic()
-        if status != self.last_health_status or (now - self.last_health_time) >= 1.0:
+        if status != self.last_health_status:
             self.health_pub.publish(String(data=status))
             self.last_health_status = status
-            self.last_health_time = now
 
     def read_loop(self):
         """
