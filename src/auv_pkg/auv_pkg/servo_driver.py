@@ -30,7 +30,8 @@ class ServoDriverNode(LifecycleNode):
 
         # Parameters
         self.declare_parameter('glide_position', [90.0, 135.0, 90.0, 135.0, 90.0, 90.0])
-        self.declare_parameter('update_rate_hz', 60.0)
+        # Default 60Hz. Ideally, keep this higher than your Interpolator rate.
+        self.declare_parameter('update_rate_hz', 60.0) 
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)
         self.declare_parameter('stubborn', True)
@@ -76,7 +77,6 @@ class ServoDriverNode(LifecycleNode):
         self._restoration_target = os.environ.pop('SERVO_DRIVER_TARGET_STATE', None)
         self._restoration_attempted = False
         self._restoration_timer = self.create_timer(1.0, self._attempt_restore_lifecycle_state)
-
 
     def restart_process(self):
         if not self.stubborn:
@@ -177,45 +177,77 @@ class ServoDriverNode(LifecycleNode):
 
     def start_refresh_loop(self):
         update_rate_hz = self.get_parameter('update_rate_hz').value
+        # Ensure we have a valid rate
+        if update_rate_hz <= 0:
+            update_rate_hz = 60.0
+        
         self.refresh_timer = self.create_timer(1.0 / update_rate_hz, self.refresh_servo_positions)
         self.get_logger().info(f"Started refresh loop at {update_rate_hz} Hz.")
 
     def refresh_servo_positions(self):
+        """
+        Main hardware loop.
+        1. Reads latest targets.
+        2. Writes to I2C (if changed).
+        3. Updates current state.
+        4. Publishes state.
+        """
         try:
+            # Snapshot targets quickly to minimize lock time
+            targets_snapshot = []
             with self.target_lock:
-                target_angles_copy = self.last_target_angles.copy()
+                targets_snapshot = list(enumerate(self.last_target_angles))
 
-            for servo_number, target_angle in enumerate(target_angles_copy):
-                # Skip update if publisher sent None or NaN for this servo.
-                # Future publishers should avoid sending None values.
+            # Perform Hardware I/O
+            # We iterate blindly through the snapshot. The snapshot is a copy, so safe to iterate.
+            for servo_number, target_angle in targets_snapshot:
+                
+                # Validation checks
                 if target_angle is None or math.isnan(target_angle):
                     continue
-                if servo_number in self.servos:
-                    last_angle = (
-                        self.current_angles[servo_number]
-                        if servo_number < len(self.current_angles)
-                        else None
-                    )
-                    if (
-                        last_angle is None
-                        or abs(last_angle - target_angle) > self.angle_tolerance_deg
-                    ):
-                        if not self.simulation_mode:
+                
+                # Check if this servo is actually configured
+                if servo_number not in self.servos and not self.simulation_mode:
+                    continue
+
+                # Determine last known angle for deadband check
+                last_angle = None
+                if servo_number < len(self.current_angles):
+                    last_angle = self.current_angles[servo_number]
+
+                # Deadband Check: Only write if change > tolerance
+                if (last_angle is None or abs(last_angle - target_angle) > self.angle_tolerance_deg):
+                    
+                    if not self.simulation_mode:
+                        try:
                             self.servos[servo_number].angle = target_angle
-                        if servo_number < len(self.current_angles):
-                            self.current_angles[servo_number] = target_angle
-                        else:
-                            # Extend list if new servo index encountered
-                            self.current_angles.extend(
-                                [0.0] * (servo_number + 1 - len(self.current_angles))
-                            )
-                            self.current_angles[servo_number] = target_angle
+                        except ValueError as ve:
+                            # Usually means angle out of range for the library
+                            self.get_logger().warn(f"Servo {servo_number} Value Error: {ve}")
+                            continue
+                        except OSError as e:
+                            # I2C IO Error
+                            raise e # Re-raise to be caught by outer try/except for failure tracking
+
+                    # Update internal tracking of "current" state
+                    if servo_number < len(self.current_angles):
+                        self.current_angles[servo_number] = target_angle
+                    else:
+                        # Extend list if needed
+                        self.current_angles.extend(
+                            [0.0] * (servo_number + 1 - len(self.current_angles))
+                        )
+                        self.current_angles[servo_number] = target_angle
+
+            # Publish the Resulting State
+            # This is the ONLY place this should be published to ensure truth.
+            self._publish_current_servo_angles()
 
         except Exception as e:
             self.get_logger().error(f"I2C error while refreshing servo positions: {e}")
-            if "Remote I/O" in str(e) or "No device" in str(e):
+            if "Remote I/O" in str(e) or "No device" in str(e) or "[Errno 121]" in str(e):
                 self.record_failure_and_check_restart()
-                    
+
     def move_servos_to_glide_position(self):
         glide_position = self.get_parameter('glide_position').value
 
@@ -223,7 +255,10 @@ class ServoDriverNode(LifecycleNode):
             self.get_logger().info(f"Moving servos to glide position: {glide_position}")
             for i, angle in enumerate(glide_position):
                 if i in self.servos:
-                    self.servos[i].angle = angle
+                    try:
+                        self.servos[i].angle = angle
+                    except Exception as e:
+                         self.get_logger().warn(f"Failed to set glide for servo {i}: {e}")
 
         # Update internal tracking
         with self.target_lock:
@@ -232,7 +267,6 @@ class ServoDriverNode(LifecycleNode):
 
         # Immediately publish angles
         self._publish_current_servo_angles()
-
 
     def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Configuring Servo Driver Node...')
@@ -255,7 +289,7 @@ class ServoDriverNode(LifecycleNode):
                 self.i2c = busio.I2C(board.SCL, board.SDA)
                 self.pca = PCA9685(self.i2c)
                 self.pca.frequency = 60
-                time.sleep(2.0)
+                time.sleep(1.0) # Gave it a bit more time to settle
                 self.servos = {
                     0: Servo(self.pca.channels[0], min_pulse=500, max_pulse=2500),
                     1: Servo(self.pca.channels[1], min_pulse=500, max_pulse=2500),
@@ -311,8 +345,7 @@ class ServoDriverNode(LifecycleNode):
 
         if self.hold_active and not previous_hold_state:
             # Clear any notion of an in-flight canned routine so the roll PID can
-            # immediately assume control of the wings. The PID will continue to
-            # update servos 1 and 3 while the hold is active.
+            # immediately assume control of the wings.
             self.executing_movement = False
             self.current_movement_type = ''
             self._freeze_targets_at_current_positions()
@@ -333,8 +366,7 @@ class ServoDriverNode(LifecycleNode):
                 if idx < len(self.last_target_angles):
                     self.last_target_angles[idx] = angle
 
-        # Share the frozen pose with other nodes for consistency.
-        self._publish_current_servo_angles()
+        # We do not publish here anymore; the refresh loop will handle it.
 
     def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info('Activating Servo Driver Node...')
@@ -401,6 +433,11 @@ class ServoDriverNode(LifecycleNode):
             self.record_failure_and_check_restart()
 
     def _servo_command_callback(self, msg: ServoMovementCommand):
+        """
+        Receives commands and updates the target_angles.
+        CRITICAL FIX: Does NOT publish current angles. This prevents the 'feedback loop lie'
+        where we report old angles to the interpolator before the hardware has actually moved.
+        """
         if self.debug_logging:
             self.get_logger().info(f'Received command: {msg}')
 
@@ -424,8 +461,7 @@ class ServoDriverNode(LifecycleNode):
 
             if self.hold_active and not is_pid_control:
                 # Drop any queued interpolation instructions while the roll PID
-                # is responsible for the wings. This prevents commands buffered
-                # before the hold from continuing to run on the hardware.
+                # is responsible for the wings.
                 if self.debug_logging:
                     self.get_logger().info(
                         "Wing hold active; ignoring non-PID command with movement_type=%s",
@@ -433,29 +469,30 @@ class ServoDriverNode(LifecycleNode):
                     )
                 return
 
-            # === NORMAL SERVO EXECUTION ===
+            # === UPDATE TARGETS ONLY ===
             with self.target_lock:
                 for i, servo_number in enumerate(msg.servo_numbers):
+                    # Safety check on array bounds
                     if 0 <= servo_number < len(self.last_target_angles):
                         target_angle = msg.target_angles[i]
-                        # Ignore None or NaN target angles; publishers should
-                        # provide explicit values for commanded servos.
+                        # Ignore None or NaN target angles
                         if target_angle is None or math.isnan(target_angle):
                             continue
                         self.last_target_angles[servo_number] = target_angle
-
-
-            self._publish_current_servo_angles()
+            
+            # NOTE: We intentionally REMOVED the publish call here.
+            # The refresh_servo_positions loop is the source of truth.
 
         except Exception as e:
-            self.get_logger().error(f'Failed to execute command: {e}')
+            self.get_logger().error(f'Failed to process command: {e}')
             if "Remote I/O" in str(e) or "No device" in str(e):
                 self.record_failure_and_check_restart()
 
     def _publish_current_servo_angles(self):
         angles_msg = Float32MultiArray()
         with self.target_lock:
-            angles_msg.data = self.current_angles.copy()
+            # Send a copy to avoid threading issues
+            angles_msg.data = list(self.current_angles)
 
         self.angles_publisher.publish(angles_msg)
 
@@ -476,7 +513,9 @@ class ServoDriverNode(LifecycleNode):
             status_msg = String()
             status_msg.data = enriched_message
             self.busy_status_publisher.publish(status_msg)
-            self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
+            # Log only if significantly different to reduce spam
+            if self.debug_logging: 
+                self.get_logger().info(f"[ServoDriver Status] Published: {status_msg.data}")
             self.last_published_status = enriched_message
 
     def _compose_status_message(self, base_message: str) -> str:
