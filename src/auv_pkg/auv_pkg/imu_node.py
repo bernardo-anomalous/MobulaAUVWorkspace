@@ -115,6 +115,9 @@ class RobustThreadedIMU(Node):
         self.last_hw_time = time.monotonic()
         self.new_hw_data_available = False
 
+        self.last_health_status = None
+        self.last_health_time = 0.0
+
         self.i2c = None
         self.bno = None
 
@@ -172,6 +175,13 @@ class RobustThreadedIMU(Node):
             self.get_logger().error(f"Rebuild Failed: {e}")
             return False
 
+    def _publish_health(self, status):
+        now = time.monotonic()
+        if status != self.last_health_status or (now - self.last_health_time) >= 1.0:
+            self.health_pub.publish(String(data=status))
+            self.last_health_status = status
+            self.last_health_time = now
+
     def read_loop(self):
         """
         The Miner Thread. It handles the dirty work of I2C.
@@ -213,8 +223,8 @@ class RobustThreadedIMU(Node):
                 
                 if is_critical:
                     self.get_logger().error(f"CRITICAL I2C FAILURE: {error_str}")
-                    self.health_pub.publish(String(data=f"CRITICAL: {error_str}"))
-                    
+                    self._publish_health(f"CRITICAL: {error_str}")
+
                     with self.lock: self.sensor_ready = False
                     
                     # RETRY LOOP
@@ -223,7 +233,7 @@ class RobustThreadedIMU(Node):
                         if self._rebuild_hardware():
                             self.get_logger().info(">>> SENSOR RECOVERED <<<")
                             with self.lock: self.sensor_ready = True
-                            self.health_pub.publish(String(data="IMU OK"))
+                            self._publish_health("IMU OK")
                             break # Back to main loop
                         time.sleep(2.0)
                 else:
@@ -253,9 +263,12 @@ class RobustThreadedIMU(Node):
         # If dead for > 2s, we are in trouble
         if dt > 2.0:
             status = "RECOVERING" if not is_ready else "STALE"
-            self.health_pub.publish(String(data=status))
+            self._publish_health(status)
             # Stop spinning the virtual model if we have no data
             hw_gyro = (0.0, 0.0, 0.0)
+        else:
+            status = "IMU OK" if is_ready else "RECOVERING"
+            self._publish_health(status)
 
         # --- PREDICTION (Gyro Integration) ---
         dq = quat_from_gyro(hw_gyro[0], hw_gyro[1], hw_gyro[2], dt)
