@@ -28,19 +28,17 @@ class ServoDriverNode(LifecycleNode):
         super().__init__('servo_driver_node')
         self.get_logger().info('Servo Driver Node initialized.')
 
-        #Params
+        # Params
         self.declare_parameter('glide_position', [90.0, 135.0, 90.0, 135.0, 90.0, 90.0])
         self.declare_parameter('update_rate_hz', 60.0) 
         self.declare_parameter('simulation_mode', False)
         self.declare_parameter('debug_logging', False)
         self.declare_parameter('stubborn', True)
 
-        # --- NEW PARAMETERS FOR INRUSH PROTECTION ---
-        # Delay (seconds) between waking each servo to prevent Brownouts
-        self.declare_parameter('startup_stagger_delay', 0.25) 
-        # Max speed (degrees per second) to smooth out jerky movements
-        self.declare_parameter('max_slew_rate_deg_s', 120.0) 
-        # ---------------------------------------------
+        # --- NEW PARAMETERS ---
+        # Specific delay for the heavy lifters (Servo 0 and 2)
+        self.declare_parameter('heavy_servo_startup_delay', 1.5) 
+        # ----------------------
 
         self.simulation_mode = False
         self.debug_logging = False
@@ -48,7 +46,7 @@ class ServoDriverNode(LifecycleNode):
         self.pca = None
         self.servos = {}
         self.current_angles = []
-        self.angle_tolerance_deg = 0.5  # Reduced slightly for smoother control
+        self.angle_tolerance_deg = 0.5 
         self.last_target_angles = [90.0] * 6
         self.stubborn = bool(self.get_parameter('stubborn').value)
 
@@ -191,20 +189,10 @@ class ServoDriverNode(LifecycleNode):
 
     def refresh_servo_positions(self):
         """
-        Main hardware loop with Slew Rate Limiting.
-        Prevent brownouts during operation by clamping sudden moves.
+        Main hardware loop.
+        REVERTED: No Slew Rate Limiting. Direct passthrough for Motion Planner compatibility.
         """
         try:
-            # 1. Setup Slew Limiting Math
-            update_rate = self.get_parameter('update_rate_hz').value
-            max_rate_deg_s = self.get_parameter('max_slew_rate_deg_s').value
-            
-            # Max degrees per tick (e.g., 120 deg/s / 60Hz = 2.0 degrees max per tick)
-            if update_rate > 0:
-                max_step_per_tick = max_rate_deg_s / update_rate
-            else:
-                max_step_per_tick = 2.0 # Fallback safety
-
             # Snapshot targets
             targets_snapshot = []
             with self.target_lock:
@@ -224,28 +212,14 @@ class ServoDriverNode(LifecycleNode):
                 if servo_number < len(self.current_angles):
                     current_angle = self.current_angles[servo_number]
 
-                # --- SLEW RATE LIMITING LOGIC ---
-                command_angle = target_angle
-
+                # Deadband Check Only (No Slew Math)
                 if current_angle is not None:
-                    diff = target_angle - current_angle
-                    
-                    # If the requested jump is huge, clamp it
-                    if abs(diff) > max_step_per_tick:
-                        # Determine direction (+1 or -1)
-                        sign = 1.0 if diff > 0 else -1.0
-                        # Calculate limited step
-                        command_angle = current_angle + (max_step_per_tick * sign)
-                    
-                    # Check Deadband using the NEW calculated command_angle
-                    # (If we are already close enough, don't spam the I2C bus)
-                    if abs(current_angle - command_angle) < self.angle_tolerance_deg:
+                     if abs(current_angle - target_angle) < self.angle_tolerance_deg:
                         continue 
-                # --------------------------------
 
                 if not self.simulation_mode:
                     try:
-                        self.servos[servo_number].angle = command_angle
+                        self.servos[servo_number].angle = target_angle
                     except ValueError as ve:
                         self.get_logger().warn(f"Servo {servo_number} Value Error: {ve}")
                         continue
@@ -253,14 +227,14 @@ class ServoDriverNode(LifecycleNode):
                         # I2C IO Error
                         raise e 
 
-                # Update internal tracking to what we ACTUALLY sent
+                # Update internal tracking
                 if servo_number < len(self.current_angles):
-                    self.current_angles[servo_number] = command_angle
+                    self.current_angles[servo_number] = target_angle
                 else:
                     self.current_angles.extend(
                         [0.0] * (servo_number + 1 - len(self.current_angles))
                     )
-                    self.current_angles[servo_number] = command_angle
+                    self.current_angles[servo_number] = target_angle
 
             # Publish State
             self._publish_current_servo_angles()
@@ -272,35 +246,45 @@ class ServoDriverNode(LifecycleNode):
 
     def move_servos_to_glide_position(self):
         """
-        Moves servos to glide position with STAGGERED STARTUP.
-        Prioritizes big servos (0 and 2) first to handle inrush current.
+        Moves servos to glide position with CUSTOM STAGGERED STARTUP.
+        SEQUENCE:
+        1. Servo 0 -> Wait 1.5s
+        2. Servo 2 -> Wait 1.5s
+        3. All remaining servos -> No Wait
         """
         glide_position = self.get_parameter('glide_position').value
-        stagger_delay = self.get_parameter('startup_stagger_delay').value
+        wait_time = self.get_parameter('heavy_servo_startup_delay').value
 
         if not self.simulation_mode:
-            self.get_logger().info(f"Initializing servos. Priority: 0 & 2. Stagger: {stagger_delay}s")
+            self.get_logger().info(f"Initializing servos with Heavy Lifter Sequence (Wait={wait_time}s)")
             
-            # --- DEFINE PRIORITY ORDER ---
-            # 1. Heavy Lifters (Servo 0 and 2)
-            # 2. The Rest (1, 3, 4, 5...)
-            priority_indices = [0, 2]
-            remaining_indices = [i for i in range(len(glide_position)) if i not in priority_indices]
-            
-            full_startup_order = priority_indices + remaining_indices
-            # -----------------------------
+            # --- PHASE 1: Servo 0 ---
+            if 0 in self.servos and len(glide_position) > 0:
+                try:
+                    self.get_logger().info("Initializing Servo 0...")
+                    self.servos[0].angle = glide_position[0]
+                    time.sleep(wait_time)
+                except Exception as e:
+                    self.get_logger().warn(f"Failed to init servo 0: {e}")
 
-            for i in full_startup_order:
-                # Safety check if index exists in config
+            # --- PHASE 2: Servo 2 ---
+            if 2 in self.servos and len(glide_position) > 2:
+                try:
+                    self.get_logger().info("Initializing Servo 2...")
+                    self.servos[2].angle = glide_position[2]
+                    time.sleep(wait_time)
+                except Exception as e:
+                    self.get_logger().warn(f"Failed to init servo 2: {e}")
+
+            # --- PHASE 3: The Rest (1, 3, 4, 5) ---
+            self.get_logger().info("Initializing remaining servos...")
+            remaining_indices = [1, 3, 4, 5]
+            
+            for i in remaining_indices:
                 if i < len(glide_position) and i in self.servos:
-                    target_angle = glide_position[i]
                     try:
-                        self.servos[i].angle = target_angle
-                        
-                        # Wait for this servo's inrush spike to settle
-                        if stagger_delay > 0:
-                            time.sleep(stagger_delay)
-                            
+                        self.servos[i].angle = glide_position[i]
+                        # NO SLEEP HERE - Fire them all at once (or as fast as I2C allows)
                     except Exception as e:
                          self.get_logger().warn(f"Failed to set glide for servo {i}: {e}")
 
