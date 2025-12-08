@@ -220,7 +220,10 @@ class WingRollController(Node):
         if not self.last_pid_active_state: self.last_pid_active_state = True
 
         # === PID CALCULATION ===
-        error_roll = -(self.target_roll - self.current_roll)
+        # IMU orientation is now aligned with the vehicle frame; remove the
+        # previous inversion so positive roll readings generate corrective
+        # motion in the proper direction.
+        error_roll = self.target_roll - self.current_roll
         
         # Deadband: Ignore < 1.0 degree errors to save battery
         if abs(error_roll) < 1.0: error_roll = 0.0

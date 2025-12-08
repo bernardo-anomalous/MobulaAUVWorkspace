@@ -155,7 +155,10 @@ class TailPitchRollController(Node):
         # ==========================
         # === PITCH PID (Biomimetic) ===
         # ==========================
-        error_pitch = self.target_pitch - self.current_pitch
+        # IMU orientation is now aligned with the vehicle frame, so use
+        # (measured - target) to keep the correction direction consistent
+        # with the previously inverted installation.
+        error_pitch = self.current_pitch - self.target_pitch
         
         # Deadband: Relax if error is tiny (< 1.0 deg)
         if abs(error_pitch) < 1.0: error_pitch = 0.0
