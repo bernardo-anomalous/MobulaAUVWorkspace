@@ -155,7 +155,7 @@ class TailPitchRollController(Node):
         # ==========================
         # === PITCH PID (Biomimetic) ===
         # ==========================
-        error_pitch = self.target_pitch - self.current_pitch
+        error_pitch = self.current_pitch - self.target_pitch
         
         # Deadband: Relax if error is tiny (< 1.0 deg)
         if abs(error_pitch) < 1.0: error_pitch = 0.0
