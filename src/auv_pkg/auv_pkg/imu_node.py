@@ -68,6 +68,20 @@ def quat_from_gyro(gx, gy, gz, dt):
     return (gx*s, gy*s, gz*s, math.cos(half))
 
 
+def yaw_quaternion(angle_rad: float):
+    """Quaternion representing a rotation about Z by ``angle_rad``."""
+    half = 0.5 * angle_rad
+    return (0.0, 0.0, math.sin(half), math.cos(half))
+
+
+def rotate_vector_z(vector, angle_rad: float):
+    """Rotate a 3D vector about Z by ``angle_rad``."""
+    x, y, z = vector
+    c = math.cos(angle_rad)
+    s = math.sin(angle_rad)
+    return (c * x - s * y, s * x + c * y, z)
+
+
 class RobustThreadedIMU(Node):
     def __init__(self):
         super().__init__('imu_node')
@@ -80,10 +94,14 @@ class RobustThreadedIMU(Node):
         
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
-        
+
         # Default Heading Offset (Calibrated)
-        self.declare_parameter('mounting_offset_deg', 250) 
+        self.declare_parameter('mounting_offset_deg', 250)
         self.mounting_offset_deg = float(self.get_parameter('mounting_offset_deg').value)
+
+        # Yaw alignment between the IMU and vehicle frame (degrees)
+        self.declare_parameter('mounting_yaw_deg', 0.0)
+        self.mounting_yaw_deg = float(self.get_parameter('mounting_yaw_deg').value)
         
         # --- Publishers ---
         self.imu_publisher_ = self.create_publisher(Imu, 'imu/data', 10)
@@ -126,7 +144,9 @@ class RobustThreadedIMU(Node):
 
         self.timer = self.create_timer(1.0/self.publish_rate, self.publish_cycle)
         
-        self.get_logger().info(f"Robust IMU Node v2.0 Started. Offset: {self.mounting_offset_deg}")
+        self.get_logger().info(
+            f"Robust IMU Node v2.0 Started. Offset: {self.mounting_offset_deg}, Mount yaw: {self.mounting_yaw_deg}"
+        )
 
     # --- TOPIC CALLBACKS ---
     def cb_nudge_heading(self, msg):
@@ -253,6 +273,7 @@ class RobustThreadedIMU(Node):
             is_ready = self.sensor_ready
             is_fresh = self.new_hw_data_available
             current_offset = self.mounting_offset_deg
+            mounting_yaw_deg = self.mounting_yaw_deg
             if is_fresh: self.new_hw_data_available = False
 
         dt = now - last_time
@@ -270,8 +291,15 @@ class RobustThreadedIMU(Node):
         # --- PREDICTION (Gyro Integration) ---
         dq = quat_from_gyro(hw_gyro[0], hw_gyro[1], hw_gyro[2], dt)
         predicted_q = q_normalize(q_mul(hw_q, dq))
-        
-        self.publish_ros_msgs(predicted_q, hw_gyro, hw_accel, current_offset)
+
+        yaw_rad = math.radians(mounting_yaw_deg)
+        mounting_correction_q = yaw_quaternion(-yaw_rad)
+
+        corrected_q = q_normalize(q_mul(predicted_q, mounting_correction_q))
+        corrected_gyro = rotate_vector_z(hw_gyro, -yaw_rad)
+        corrected_accel = rotate_vector_z(hw_accel, -yaw_rad)
+
+        self.publish_ros_msgs(corrected_q, corrected_gyro, corrected_accel, current_offset)
 
     def yaw_to_cardinal(self, heading_degrees):
         directions = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West']
