@@ -5,32 +5,46 @@ import math
 import sys
 import time
 import threading
-import signal
 from collections import deque
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from rclpy.executors import MultiThreadedExecutor
 
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import String, Float32
+from std_srvs.srv import Trigger  # Standard Service for resets
 
-# --- YOUR UTILS ---
-from .utils import quaternion_to_euler
+# --- UTILS FALLBACK ---
+try:
+    from .utils import quaternion_to_euler
+except ImportError:
+    def quaternion_to_euler(x, y, z, w):
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        roll = math.atan2(t0, t1)
+        t2 = +2.0 * (w * y - z * x)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+        pitch = math.asin(t2)
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw = math.atan2(t3, t4)
+        return roll, pitch, yaw
 
 # --- Hardware Imports ---
 try:
     from adafruit_extended_bus import ExtendedI2C
     _HAS_EXTENDED_I2C = True
-except Exception:
+except ImportError:
     _HAS_EXTENDED_I2C = False
 
 try:
     import board
     import busio
-except Exception:
+except ImportError:
     pass
 
 from adafruit_bno08x.i2c import BNO08X_I2C
@@ -67,15 +81,11 @@ def quat_from_gyro(gx, gy, gz, dt):
     s = math.sin(half) / omega
     return (gx*s, gy*s, gz*s, math.cos(half))
 
-
 def yaw_quaternion(angle_rad: float):
-    """Quaternion representing a rotation about Z by ``angle_rad``."""
     half = 0.5 * angle_rad
     return (0.0, 0.0, math.sin(half), math.cos(half))
 
-
 def rotate_vector_z(vector, angle_rad: float):
-    """Rotate a 3D vector about Z by ``angle_rad``."""
     x, y, z = vector
     c = math.cos(angle_rad)
     s = math.sin(angle_rad)
@@ -87,7 +97,7 @@ class RobustThreadedIMU(Node):
         super().__init__('imu_node')
 
         # --- Parameters ---
-        self.declare_parameter('i2c_bus_id', 3)   
+        self.declare_parameter('i2c_bus_id', 3)    
         self.declare_parameter('i2c_address', 0x4B)
         self.bus_id = int(self.get_parameter('i2c_bus_id').value)
         self.addr = int(self.get_parameter('i2c_address').value)
@@ -95,11 +105,9 @@ class RobustThreadedIMU(Node):
         self.declare_parameter('publish_rate_hz', 60.0)
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
 
-        # Default Heading Offset (Calibrated)
         self.declare_parameter('mounting_offset_deg', 0)
         self.mounting_offset_deg = float(self.get_parameter('mounting_offset_deg').value)
 
-        # Yaw alignment between the IMU and vehicle frame (degrees)
         self.declare_parameter('mounting_yaw_deg', 0.0)
         self.mounting_yaw_deg = float(self.get_parameter('mounting_yaw_deg').value)
         
@@ -111,17 +119,20 @@ class RobustThreadedIMU(Node):
         health_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.health_pub = self.create_publisher(String, 'imu/health_status', health_qos)
 
-        # --- Subscribers (Dynamic Adjustment) ---
+        # --- Subscribers ---
         self.create_subscription(Float32, 'imu/nudge_heading', self.cb_nudge_heading, 10)
         self.create_subscription(Float32, 'imu/set_heading_offset', self.cb_set_heading, 10)
+        
+        # --- Service ---
+        self.create_service(Trigger, 'imu/trigger_reset', self.cb_trigger_reset_service)
 
         # --- State ---
         self.lock = threading.Lock()
         self.running = True
         self.sensor_ready = False
         self.reset_count = 0
+        self.forced_reset_pending = False  # Flag to signal read_thread
         
-        # Critical Errors that trigger a BUS RESET
         self.CRITICAL_ERRORS = [
             "No device", "Remote I/O", "Input/output error",
             "Unprocessable Batch bytes", "Errno 6", "255"
@@ -145,7 +156,7 @@ class RobustThreadedIMU(Node):
         self.timer = self.create_timer(1.0/self.publish_rate, self.publish_cycle)
         
         self.get_logger().info(
-            f"Robust IMU Node v2.0 Started. Offset: {self.mounting_offset_deg}, Mount yaw: {self.mounting_yaw_deg}"
+            f"Robust IMU Node v2.2 Started. Service: /imu/trigger_reset"
         )
 
     # --- TOPIC CALLBACKS ---
@@ -159,9 +170,41 @@ class RobustThreadedIMU(Node):
             self.mounting_offset_deg = msg.data % 360.0
         self.get_logger().info(f"Offset Set to: {self.mounting_offset_deg:.1f}")
 
-    # --- HARDWARE RECOVERY LOGIC (From your old Robust Node) ---
+    # --- SERVICE CALLBACK ---
+    def cb_trigger_reset_service(self, request, response):
+        """
+        Trigger a manual reset via ROS Service.
+        """
+        self.get_logger().warn(">>> MANUAL RESET REQUESTED VIA SERVICE <<<")
+        
+        # Signal the read_thread to throw an exception and restart
+        self.forced_reset_pending = True
+        
+        # Wait briefly to confirm the thread picked it up (max 1s)
+        # We don't want to block the executor too long
+        wait_start = time.monotonic()
+        ack = False
+        while time.monotonic() - wait_start < 1.0:
+            if not self.forced_reset_pending: # Flag gets cleared when read_loop acts
+                ack = True
+                break
+            time.sleep(0.05)
+            
+        if ack:
+            response.success = True
+            response.message = "IMU Reset Initiated"
+        else:
+            # If the loop is stuck, we still return true because the flag is set,
+            # so it WILL happen eventually.
+            response.success = True
+            response.message = "IMU Reset Queued (Loop busy)"
+            
+        return response
+
+    # --- HARDWARE RECOVERY LOGIC ---
     def _rebuild_hardware(self):
-        """Destroys and recreates the I2C connection."""
+        """Destroys and recreates the I2C connection with a 'Hail Mary' soft reset."""
+        self._publish_health("RESETTING")
         self.get_logger().warn(f"Performing I2C Bus Reset #{self.reset_count + 1}...")
         
         # 1. Teardown
@@ -173,18 +216,38 @@ class RobustThreadedIMU(Node):
         
         self.i2c = None
         self.bno = None
-        time.sleep(0.5) # Physics wait
+        time.sleep(0.5)
 
-        # 2. Rebuild
+        # 2. Rebuild Bus & Hail Mary Reset
         try:
             if _HAS_EXTENDED_I2C:
                 self.i2c = ExtendedI2C(self.bus_id)
             else:
                 self.i2c = busio.I2C(board.SCL, board.SDA)
 
+            # --- SHTP SOFT RESET ATTEMPT ---
+            try:
+                # Packet: [LenLSB, LenMSB, Channel(1=Exe), Seq, Cmd(1=Reset)]
+                # 0x05 bytes total, Ch 1, Seq 0, Cmd 1
+                reset_pkt = bytearray([0x05, 0x00, 0x01, 0x00, 0x01]) 
+                
+                while not self.i2c.try_lock():
+                    pass
+                try:
+                    self.i2c.writeto(self.addr, reset_pkt)
+                    self.get_logger().info(">>> Sent SHTP Soft Reset Command <<<")
+                finally:
+                    self.i2c.unlock()
+                
+                time.sleep(0.5) # Wait for reboot
+            except Exception as e:
+                self.get_logger().warn(f"Soft Reset Command Failed (Sensor might be dead): {e}")
+            # -------------------------------
+
+            # 3. Initialize Sensor
             self.bno = BNO08X_I2C(self.i2c, address=self.addr)
             
-            # Enable features (No Args!)
+            # Enable features
             self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
             self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
             self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
@@ -192,6 +255,11 @@ class RobustThreadedIMU(Node):
             return True
         except Exception as e:
             self.get_logger().error(f"Rebuild Failed: {e}")
+            # Cleanup
+            try: 
+                if self.i2c: self.i2c.deinit()
+            except: pass
+            self.i2c = None
             return False
 
     def _publish_health(self, status):
@@ -212,8 +280,12 @@ class RobustThreadedIMU(Node):
 
         while self.running and rclpy.ok():
             try:
+                # --- CHECK MANUAL TRIGGER ---
+                if self.forced_reset_pending:
+                    self.forced_reset_pending = False
+                    raise RuntimeError("Manual Reset Triggered")
+
                 # --- READ ATTEMPT ---
-                # This blocks. If I2C dies, this throws an Exception.
                 qi, qj, qk, qr = self.bno.quaternion
                 ax, ay, az = self.bno.acceleration
                 gx, gy, gz = self.bno.gyro
@@ -235,13 +307,15 @@ class RobustThreadedIMU(Node):
                 # --- ERROR HANDLING ---
                 error_str = str(e)
                 
-                # Check for "Bus Killers"
-                is_critical = any(c in error_str for c in self.CRITICAL_ERRORS) or isinstance(e, OSError)
+                is_manual = "Manual Reset" in error_str
+                is_critical = any(c in error_str for c in self.CRITICAL_ERRORS) \
+                              or isinstance(e, OSError) \
+                              or is_manual
                 
                 if is_critical:
-                    self.get_logger().error(f"CRITICAL I2C FAILURE: {error_str}")
-                    self._publish_health(f"CRITICAL: {error_str}")
-
+                    log_func = self.get_logger().warn if is_manual else self.get_logger().error
+                    log_func(f"CRITICAL FAILURE: {error_str}")
+                    
                     with self.lock: self.sensor_ready = False
                     
                     # RETRY LOOP
@@ -251,17 +325,15 @@ class RobustThreadedIMU(Node):
                             self.get_logger().info(">>> SENSOR RECOVERED <<<")
                             with self.lock: self.sensor_ready = True
                             self._publish_health("IMU OK")
-                            break # Back to main loop
+                            break 
                         time.sleep(2.0)
                 else:
-                    # Minor glitch (CRC check failed, etc)
                     self.get_logger().warn(f"Minor Glitch: {error_str}")
                     time.sleep(0.05)
 
     def publish_cycle(self):
         """
         The Broadcast Thread. Runs at 60Hz. 
-        Uses prediction if the Read Thread is busy resetting the bus.
         """
         now = time.monotonic()
         
@@ -278,17 +350,15 @@ class RobustThreadedIMU(Node):
 
         dt = now - last_time
         
-        # If dead for > 2s, we are in trouble
         if dt > 2.0:
             status = "RECOVERING" if not is_ready else "STALE"
             self._publish_health(status)
-            # Stop spinning the virtual model if we have no data
             hw_gyro = (0.0, 0.0, 0.0)
         else:
             status = "IMU OK" if is_ready else "RECOVERING"
             self._publish_health(status)
 
-        # --- PREDICTION (Gyro Integration) ---
+        # --- PREDICTION ---
         dq = quat_from_gyro(hw_gyro[0], hw_gyro[1], hw_gyro[2], dt)
         predicted_q = q_normalize(q_mul(hw_q, dq))
 
@@ -316,19 +386,17 @@ class RobustThreadedIMU(Node):
         msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z = accel
         self.imu_publisher_.publish(msg)
 
-        # 2. Euler (Matches your Utils)
+        # 2. Euler
         roll, pitch, raw_yaw = quaternion_to_euler(*q)
-        
         vec = Vector3()
         vec.x = roll
         vec.y = pitch
         vec.z = raw_yaw
         self.rpy_publisher_.publish(vec)
         
-        # 3. Heading (Matches your GUI)
+        # 3. Heading
         heading_degrees = (-raw_yaw + offset + 360) % 360
         cardinal = self.yaw_to_cardinal(heading_degrees)
-        
         heading_str = f'Heading: {cardinal}, {heading_degrees:.2f} degrees'
         self.heading_publisher_.publish(String(data=heading_str))
 
