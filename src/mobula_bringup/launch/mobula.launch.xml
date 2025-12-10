@@ -1,20 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <launch>
-    <!-- Start log bridge first for reporting -->
-    <node pkg="auv_pkg" exec="console_bridge_node"/> 
-    <!-- Start IMU Node (no delay) -->
+  <!-- Start log bridge immediately -->
+  <node pkg="auv_pkg" exec="console_bridge_node" />
+
+  <!-- IMU after 1.5 s -->
+  <timer period="1.5">
     <node pkg="auv_pkg" exec="imu_node" />
+  </timer>
 
-    <!-- Delay Servo Driver by 5 seconds to give IMU time to initialize -->
-    <node pkg="auv_pkg" exec="servo_driver"/>
+  <!-- Servo driver after 3.0 s -->
+  <timer period="4.0">
+    <node pkg="auv_pkg" exec="servo_driver" />
+  </timer>
 
-    <!-- Interpolator and PIDs can start normally (or add slight delay if needed) -->
-    
-    <node pkg="auv_pkg" exec="servo_interpolation"/>
-    <node pkg="auv_pkg" exec="pitch_pid"/>
-    <node pkg="auv_pkg" exec="roll_pid"/>
-    <node pkg="auv_pkg" exec="depth_sensor"/>
-    <node pkg="auv_pkg" exec="acceleration_node"/> 
-    <node pkg="auv_pkg" exec="battery_node"/> 
-    <node pkg="auv_pkg" exec="system_monitor_node"/> 
-    
+  <!-- Interpolator after 3.5 s -->
+  <timer period="3.5">
+    <node pkg="auv_pkg" exec="servo_interpolation" />
+  </timer>
+
+  <!-- Pitch PID after 4.0 s -->
+  <timer period="4.0">
+    <node pkg="auv_pkg" exec="pitch_pid" />
+  </timer>
+
+  <!-- Roll PID after 4.5 s -->
+  <timer period="4.5">
+    <node pkg="auv_pkg" exec="roll_pid" />
+  </timer>
+
+  <!-- Depth sensor after 5.0 s -->
+  <timer period="5.0">
+    <node pkg="auv_pkg" exec="depth_sensor" />
+  </timer>
+
+  <!-- Acceleration node after 5.5 s -->
+  <timer period="6.5">
+    <node pkg="auv_pkg" exec="acceleration_node" />
+  </timer>
+
+  <!-- Battery node after 6.0 s -->
+  <timer period="6.0">
+    <node pkg="auv_pkg" exec="battery_node" />
+  </timer>
+
+  <!-- System monitor after 6.5 s -->
+  <timer period="6.5">
+    <node pkg="auv_pkg" exec="system_monitor_node" />
+  </timer>
 </launch>

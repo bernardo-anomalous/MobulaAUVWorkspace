@@ -12,20 +12,25 @@ class MissionManagerNode(Node):
         super().__init__('mission_manager_node')
 
         # --- CONFIGURATION ---
-        # UPDATED: Pointing to your specific package and XML launch file
+        # The command to launch your main system
+        # Ensure 'mobula_bringup' and 'mobula.launch.xml' are correct
         self.launch_cmd = ["ros2", "launch", "mobula_bringup", "mobula.launch.xml"]
         
         # --- STATE ---
         self.mission_process = None
         
         # --- SERVICES ---
+        # 1. Start Mission
         self.create_service(Trigger, 'system/start_mission', self.cb_start)
+        # 2. Stop Mission
         self.create_service(Trigger, 'system/stop_mission', self.cb_stop)
+        # 3. Check Status (Optional)
         self.create_service(SetBool, 'system/is_running', self.cb_status)
 
         self.get_logger().info("Mission Manager Online. Ready for GUI commands.")
 
     def cb_start(self, request, response):
+        # Prevent double-launching
         if self.mission_process is not None:
             if self.mission_process.poll() is None:
                 response.success = False
@@ -35,13 +40,13 @@ class MissionManagerNode(Node):
         try:
             self.get_logger().info(f"Launching: {' '.join(self.launch_cmd)}")
             
-            # Start the launch file in a new session (Process Group)
+            # --- LAUNCH PROCESS ---
+            # We use start_new_session=True so we can kill the whole group later.
+            # We do NOT use stdout=PIPE, so logs flow directly to journalctl.
             self.mission_process = subprocess.Popen(
                 self.launch_cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
                 start_new_session=True,
-                env=os.environ.copy() # Pass current environment (ROS paths) to child
+                env=os.environ.copy() # Pass current ROS environment to child
             )
             
             response.success = True
@@ -64,12 +69,17 @@ class MissionManagerNode(Node):
         # Kill the entire process group (XML launch + spawned nodes)
         try:
             os.killpg(os.getpgid(self.mission_process.pid), signal.SIGTERM)
-            self.mission_process.wait(timeout=5.0)
-        except Exception as e:
-            self.get_logger().warn(f"Forced Kill required: {e}")
+            
+            # Wait up to 5 seconds for graceful shutdown
             try:
+                self.mission_process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                self.get_logger().warn("Process refused TERM, forcing KILL.")
                 os.killpg(os.getpgid(self.mission_process.pid), signal.SIGKILL)
-            except: pass
+                self.mission_process.wait()
+
+        except Exception as e:
+            self.get_logger().warn(f"Error during shutdown: {e}")
 
         self.mission_process = None
         response.success = True
@@ -86,8 +96,18 @@ class MissionManagerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = MissionManagerNode()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # Ensure we don't leave zombie robots if the manager dies
+        if node.mission_process:
+             try:
+                os.killpg(os.getpgid(node.mission_process.pid), signal.SIGTERM)
+             except: pass
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
