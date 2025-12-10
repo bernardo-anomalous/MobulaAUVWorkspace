@@ -96,7 +96,7 @@ class RobustThreadedIMU(Node):
         self.publish_rate = float(self.get_parameter('publish_rate_hz').value)
 
         # Default Heading Offset (Calibrated)
-        self.declare_parameter('mounting_offset_deg', 250)
+        self.declare_parameter('mounting_offset_deg', 0)
         self.mounting_offset_deg = float(self.get_parameter('mounting_offset_deg').value)
 
         # Yaw alignment between the IMU and vehicle frame (degrees)
