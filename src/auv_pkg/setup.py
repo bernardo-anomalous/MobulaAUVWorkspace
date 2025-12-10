@@ -33,6 +33,7 @@ setup(
             "battery_node = auv_pkg.battery_node:main",
             "system_monitor_node = auv_pkg.system_monitor_node:main",
             "console_bridge_node = auv_pkg.console_bridge_node:main",
+            'mission_manager_node = auv_pkg.mission_manager_node:main',
         ],
     },
 )

@@ -283,6 +283,7 @@ class RobustThreadedIMU(Node):
                 # --- CHECK MANUAL TRIGGER ---
                 if self.forced_reset_pending:
                     self.forced_reset_pending = False
+                    # We raise this to jump immediately to the Exception block below
                     raise RuntimeError("Manual Reset Triggered")
 
                 # --- READ ATTEMPT ---
@@ -313,9 +314,15 @@ class RobustThreadedIMU(Node):
                               or is_manual
                 
                 if is_critical:
-                    log_func = self.get_logger().warn if is_manual else self.get_logger().error
-                    log_func(f"CRITICAL FAILURE: {error_str}")
+                    # FIX: Do not assign the function to a variable. Call directly.
+                    msg_text = f"CRITICAL FAILURE: {error_str}"
+                    if is_manual:
+                        self.get_logger().warn(msg_text)
+                    else:
+                        self.get_logger().error(msg_text)
                     
+                    self._publish_health(f"CRITICAL: {error_str}")
+
                     with self.lock: self.sensor_ready = False
                     
                     # RETRY LOOP
