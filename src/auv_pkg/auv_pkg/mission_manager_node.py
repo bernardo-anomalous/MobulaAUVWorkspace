@@ -5,6 +5,7 @@ from std_srvs.srv import Trigger, SetBool
 import subprocess
 import signal
 import os
+import psutil  # NEW
 
 
 class MissionManagerNode(Node):
@@ -29,39 +30,88 @@ class MissionManagerNode(Node):
     # --- internal helpers ---
 
     def _stop_mission_process(self) -> bool:
-        """Stop the running mission process, if any. Returns True if something was stopped."""
+        """Stop the running mission process and all its children. Returns True if anything was stopped."""
         if self.mission_process is None:
             return False
 
-        # If process already exited, just clear state
+        # If already gone, clear and return
         if self.mission_process.poll() is not None:
             self.mission_process = None
             return False
 
-        self.get_logger().warn("Stopping Mobula Mission...")
+        pid = self.mission_process.pid
+        self.get_logger().warn(f"Stopping Mobula Mission (PID {pid})...")
+
+        # Try psutil-based tree kill first
+        try:
+            parent = psutil.Process(pid)
+            children = parent.children(recursive=True)
+            self.get_logger().info(
+                f"Found {len(children)} child processes under mission PID {pid}; terminating all."
+            )
+
+            # Send SIGTERM to children
+            for proc in children:
+                try:
+                    self.get_logger().debug(f"Terminating child PID {proc.pid} ({proc.name()})")
+                    proc.terminate()
+                except Exception as e:
+                    self.get_logger().warn(f"Error terminating child PID {proc.pid}: {e}")
+
+            # Terminate parent
+            try:
+                self.get_logger().debug(f"Terminating mission parent PID {parent.pid} ({parent.name()})")
+                parent.terminate()
+            except Exception as e:
+                self.get_logger().warn(f"Error terminating mission parent PID {parent.pid}: {e}")
+
+            # Wait up to 5 seconds
+            procs = [parent] + children
+            gone, alive = psutil.wait_procs(procs, timeout=5.0)
+
+            if alive:
+                self.get_logger().warn(
+                    f"{len(alive)} processes still alive after SIGTERM; sending SIGKILL."
+                )
+                for proc in alive:
+                    try:
+                        self.get_logger().debug(f"Killing PID {proc.pid} ({proc.name()})")
+                        proc.kill()
+                    except Exception as e:
+                        self.get_logger().warn(f"Error killing PID {proc.pid}: {e}")
+                psutil.wait_procs(alive, timeout=5.0)
+        except psutil.NoSuchProcess:
+            self.get_logger().warn("Mission parent process disappeared before we could terminate it.")
+        except Exception as e:
+            self.get_logger().warn(f"psutil-based termination failed: {e}")
+
+        # Belt & suspenders: also try killpg on the original process group
+        try:
+            pgid = os.getpgid(pid)
+            self.get_logger().info(f"Sending SIGTERM to process group {pgid}.")
+            os.killpg(pgid, signal.SIGTERM)
+        except Exception as e:
+            self.get_logger().debug(f"killpg(SIGTERM) failed or not needed: {e}")
 
         try:
-            # Kill the entire process group (launch + nodes)
-            os.killpg(os.getpgid(self.mission_process.pid), signal.SIGTERM)
+            self.mission_process.wait(timeout=2.0)
+        except Exception:
+            pass
 
-            # Wait up to 5 seconds for graceful shutdown
-            try:
-                self.mission_process.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                self.get_logger().warn("Process refused TERM, forcing KILL.")
-                os.killpg(os.getpgid(self.mission_process.pid), signal.SIGKILL)
-                self.mission_process.wait()
-        except Exception as e:
-            self.get_logger().warn(f"Error during shutdown: {e}")
+        # Final KILL on group if absolutely necessary
+        try:
+            pgid = os.getpgid(pid)
+            self.get_logger().info(f"Sending SIGKILL to process group {pgid}.")
+            os.killpg(pgid, signal.SIGKILL)
+        except Exception:
+            # If pgid no longer exists, that's fine.
+            pass
 
         self.mission_process = None
         return True
 
     def _systemctl_action(self, action: str) -> bool:
-        """
-        Fire-and-forget systemctl action (poweroff or reboot).
-        Returns True if the subprocess started successfully.
-        """
+        """Fire-and-forget systemctl action (poweroff or reboot)."""
         try:
             self.get_logger().warn(f"Initiating system {action} via systemctl...")
             subprocess.Popen(["sudo", "systemctl", action])
@@ -85,9 +135,10 @@ class MissionManagerNode(Node):
             self.mission_process = subprocess.Popen(
                 self.launch_cmd,
                 start_new_session=True,
-                env=os.environ.copy(),  # Pass current ROS environment to child
+                env=os.environ.copy(),
             )
 
+            self.get_logger().info(f"Mission launch started with PID {self.mission_process.pid}")
             response.success = True
             response.message = "Mobula Mission Launched"
         except Exception as e:
@@ -117,10 +168,7 @@ class MissionManagerNode(Node):
 
     def cb_shutdown(self, request, response):
         self.get_logger().warn("Shutdown requested via /system/shutdown")
-
-        # Stop mission if running
         self._stop_mission_process()
-
         ok = self._systemctl_action("poweroff")
         response.success = ok
         response.message = "System shutdown initiated." if ok else "Failed to initiate shutdown."
@@ -128,10 +176,7 @@ class MissionManagerNode(Node):
 
     def cb_reboot(self, request, response):
         self.get_logger().warn("Reboot requested via /system/reboot")
-
-        # Stop mission if running
         self._stop_mission_process()
-
         ok = self._systemctl_action("reboot")
         response.success = ok
         response.message = "System reboot initiated." if ok else "Failed to initiate reboot."
@@ -146,7 +191,6 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        # Ensure we don't leave zombie launches if the manager dies
         if node.mission_process:
             try:
                 os.killpg(os.getpgid(node.mission_process.pid), signal.SIGTERM)
