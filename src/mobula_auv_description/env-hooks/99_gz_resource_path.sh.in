@@ -1,0 +1,2 @@
+# Allow Gazebo (gz-sim) to resolve model://mobula_auv_description/... meshes
+ament_prepend_unique_value GZ_SIM_RESOURCE_PATH "$AMENT_CURRENT_PREFIX/share"

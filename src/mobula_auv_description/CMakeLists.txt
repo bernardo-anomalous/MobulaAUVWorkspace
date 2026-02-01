@@ -12,6 +12,9 @@ install(
   DIRECTORY urdf launch rviz meshes
   DESTINATION share/${PROJECT_NAME}/
 )
-
+ament_environment_hooks(
+  "${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/99_gz_resource_path.sh.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/env-hooks/99_gz_resource_path.dsv.in"
+)
 
 ament_package()
