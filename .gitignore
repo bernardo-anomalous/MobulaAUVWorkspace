@@ -5,3 +5,4 @@ log/
 __pycache__/
 # Ignore system monitor runtime logs
 src/auv_pkg/auv_pkg/system_monitor_logs/
+.vscode/
