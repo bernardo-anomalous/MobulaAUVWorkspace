@@ -1,0 +1,417 @@
+<?xml version="1.0"?>
+<robot name="biomimetic_manta_auv" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- =========================
+       Top-level parameters
+       ========================= -->
+  <!-- Body -->
+  <xacro:property name="body_length"             value="0.596"/> <!-- 0.599 m total length -->
+  <xacro:property name="body_width"              value="0.390"/>
+  <xacro:property name="body_height"             value="0.100"/>
+
+  <!-- Wing-root placement (relative to base_link origin) -->
+  <xacro:property name="wing_root_x"             value="0.135445"/>
+  <xacro:property name="wing_root_y_from_center" value="0.2217"/>
+  <xacro:property name="wing_root_z"             value="0.0"/>
+
+  <!-- Carrier link (left/right identical geometry) -->
+  <xacro:property name="carrier_len_x"           value="0.135445"/>
+  <xacro:property name="carrier_len_y"           value="0.1296"/>
+  <xacro:property name="carrier_thickness"       value="0.020"/>
+
+  <!-- Pitch assembly (y-dimension is long axis along span) -->
+  <xacro:property name="pitch_len_x"             value="0.135445"/>
+  <xacro:property name="pitch_len_y"             value="0.0845"/>
+  <xacro:property name="pitch_thickness"         value="0.015"/>
+
+  <!-- Wingtip proximal segment -->
+  <xacro:property name="prox_len_x"              value="0.154808"/>
+  <xacro:property name="prox_len_y"              value="0.1814"/>
+  <xacro:property name="prox_thickness"          value="0.010"/>
+
+  <!-- Wingtip distal segment (silicone) -->
+  <xacro:property name="tip_len_x"               value="0.080"/>
+  <xacro:property name="tip_len_y"               value="0.1911"/>
+  <xacro:property name="tip_thickness"           value="0.005"/>
+
+  <!-- Tail panels -->
+  <xacro:property name="tail_len_x"              value="0.30002"/>
+  <xacro:property name="tail_len_y"              value="0.180"/>
+  <xacro:property name="tail_thickness"          value="0.010"/>
+  <xacro:property name="tail_root_x"             value="-0.250736"/>
+  <xacro:property name="tail_root_y"             value="0.080"/>
+
+  <!-- Joint ranges / dynamics -->
+  <xacro:property name="carrier_limit_deg"       value="40.0"/>
+  <xacro:property name="carrier_effort"          value="114.0"/>
+  <xacro:property name="carrier_velocity"        value="3.0"/>
+  <xacro:property name="carrier_damping"         value="0.5"/>
+  <xacro:property name="carrier_friction"        value="0.1"/>
+
+  <xacro:property name="pitch_limit_deg"         value="45.0"/>
+  <xacro:property name="pitch_effort"            value="20.0"/>
+  <xacro:property name="pitch_velocity"          value="5.0"/>
+
+  <xacro:property name="tip_limit_deg"           value="45.0"/>
+  <xacro:property name="tip_effort"              value="8.0"/>
+  <xacro:property name="tip_velocity"            value="10.0"/>
+  <xacro:property name="tip_damping"             value="0.2"/>
+  <xacro:property name="tip_friction"            value="0.05"/>
+
+  <!-- Internal “end-boost” mimic multiplier (gear coupling proxy) -->
+  <xacro:property name="tip_mimic_mult"          value="0.600"/>
+
+  <!-- Tip hinge cant degrees from +Y toward +X (left wing) -->
+  <xacro:property name="tip_hinge_cant_deg"      value="55.0"/>
+
+  <!-- Spring stiffness for compliant tip (Gazebo) -->
+  <xacro:property name="tip_spring_k"            value="5.0"/>
+
+  <!-- Helpers -->
+  <xacro:property name="deg2rad"                 value="${pi/180.0}"/>
+
+  <!-- Derived angles in radians -->
+  <xacro:property name="carrier_limit_rad"       value="${carrier_limit_deg*deg2rad}"/>
+  <xacro:property name="pitch_limit_rad"         value="${pitch_limit_deg*deg2rad}"/>
+  <xacro:property name="tip_limit_rad"           value="${tip_limit_deg*deg2rad}"/>
+  <xacro:property name="tip_cant_rad"            value="${tip_hinge_cant_deg*deg2rad}"/>
+
+  <!-- Hinge axis components (left). Right is mirrored by sign. -->
+  <xacro:property name="tip_axis_x"              value="${sin(tip_cant_rad)}"/>
+  <xacro:property name="tip_axis_y"              value="${cos(tip_cant_rad)}"/>
+
+  <!-- =========================
+       Materials
+       ========================= -->
+  <material name="blue"> <color rgba="0.0 0.4 0.8 1.0"/> </material>
+  <material name="grey"> <color rgba="0.7 0.7 0.7 1.0"/> </material>
+  <material name="red"> <color rgba="0.8 0.0 0.0 1.0"/> </material>
+  <material name="orange"><color rgba="1.0 0.5 0.0 1.0"/> </material>
+  <material name="silicone_translucent"> <color rgba="0.9 0.9 0.9 0.6"/> </material>
+
+  <!-- =========================
+       Base footprint and base link
+       ========================= -->
+  <link name="base_footprint"/>
+  <joint name="base_footprint_to_base_link" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+  </joint>
+
+  <!-- =========================
+       Base link
+       ========================= -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mobula_auv_description/meshes/visual/body.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+
+    <!-- Custom collision mesh -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Body.dae"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <!-- COM from Onshape (mm -> m) -->
+      <origin xyz="0.09 0.000029 -0.04" rpy="0 0 0"/>
+      <mass value="7.0"/>
+      <!-- Inertia from Onshape -->
+      <inertia
+        ixx="0.2060"  ixy="5.3296624e-05" ixz="0.01710"
+        iyy="0.2008"  iyz="-7.782092e-06"
+        izz="0.3516"/>
+    </inertial>
+  </link>
+
+  <!-- Gazebo disable self-collision on base_link (still collides with world) -->
+  <gazebo reference="base_link">
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <!-- =========================
+       MACRO: Wing (left/right)
+       side = +1 (left), -1 (right)
+       roll_pi = 0 (left), pi (right)
+       name_suffix = left/right (lowercase) for VISUAL meshes
+       collision suffix is mapped to Left/Right for your COLLISION filenames
+       ========================= -->
+  <xacro:macro name="wing" params="side roll_pi name_suffix">
+
+    <!-- Map visual suffix (left/right) to collision suffix (Left/Right) -->
+    <xacro:property name="coll_suffix" value="${'Left' if name_suffix == 'left' else 'Right'}"/>
+
+    <!-- Carrier joint (root) -->
+    <joint name="joint_to_carrier_${name_suffix}" type="revolute">
+      <parent link="base_link"/>
+      <child  link="link_carrier_${name_suffix}"/>
+      <origin xyz="${wing_root_x} ${side*wing_root_y_from_center} ${wing_root_z}" rpy="${roll_pi} 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="${-carrier_limit_rad}" upper="${carrier_limit_rad}"
+             effort="${carrier_effort}" velocity="${carrier_velocity}"/>
+      <dynamics damping="${carrier_damping}" friction="${carrier_friction}"/>
+    </joint>
+
+    <!-- Carrier link -->
+    <link name="link_carrier_${name_suffix}">
+      <visual>
+        <origin xyz="-0.135 -0.221 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/visual/wing-1-${name_suffix}.stl"/>
+        </geometry>
+        <material name="silicone_translucent"/>
+      </visual>
+
+      <collision>
+        <origin xyz="-0.135 -0.221 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Carrier-${coll_suffix}.dae"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="-0.016175 0.065094 -0.00001" rpy="0 0 0"/>
+        <mass value="0.5"/>
+        <inertia
+          ixx="0.002906" ixy="0.000214409232" ixz="7.28e-10"
+          iyy="0.005746" iyz="4.3778e-07"
+          izz="0.008294"/>
+      </inertial>
+    </link>
+
+    <gazebo reference="link_carrier_${name_suffix}">
+      <selfCollide>false</selfCollide>
+    </gazebo>
+
+    <!-- End-boost (mimic) joint -->
+    <joint name="joint_carrier_end_boost_${name_suffix}" type="revolute">
+      <parent link="link_carrier_${name_suffix}"/>
+      <child  link="link_pitch_assembly_${name_suffix}"/>
+      <origin xyz="0 ${carrier_len_y} 0" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <mimic joint="joint_to_carrier_${name_suffix}" multiplier="${tip_mimic_mult}" offset="0"/>
+      <limit lower="-0.2" upper="0.2" effort="100.0" velocity="5.0"/>
+    </joint>
+
+    <!-- Pitch assembly -->
+    <link name="link_pitch_assembly_${name_suffix}">
+      <visual>
+        <origin xyz="-0.1348 -0.35 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/visual/wing-2-${name_suffix}.stl"/>
+        </geometry>
+        <material name="silicone_translucent"/>
+      </visual>
+
+      <collision>
+        <origin xyz="-0.1348 -0.35 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Pitch-Assembly-${coll_suffix}.dae"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0.005537 0.042586 -0.000018" rpy="0 0 0"/>
+        <mass value="0.083"/>
+        <inertia
+          ixx="0.00024067417" ixy="-1.0544874e-05" ixz="3.3305e-08"
+          iyy="0.000703447437" iyz="6.2175e-08"
+          izz="0.000903830481"/>
+      </inertial>
+    </link>
+
+    <gazebo reference="link_pitch_assembly_${name_suffix}">
+      <selfCollide>false</selfCollide>
+    </gazebo>
+
+    <!-- Pitch assembly -> wingtip proximal -->
+    <joint name="joint_pitch_assembly_to_wingtip_proximal_${name_suffix}" type="revolute">
+      <parent link="link_pitch_assembly_${name_suffix}"/>
+      <child  link="link_wingtip_proximal_${name_suffix}"/>
+      <origin xyz="0.022013 ${pitch_len_y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="${-pitch_limit_rad}" upper="${pitch_limit_rad}"
+             effort="${pitch_effort}" velocity="${pitch_velocity}"/>
+      <dynamics damping="0.1"/>
+    </joint>
+
+    <!-- Wingtip proximal -->
+    <link name="link_wingtip_proximal_${name_suffix}">
+      <visual>
+        <origin xyz="-0.1571 -0.434 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/visual/wing-3-${name_suffix}.stl"/>
+        </geometry>
+        <material name="silicone_translucent"/>
+      </visual>
+
+      <collision>
+        <origin xyz="-0.1571 -0.434 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Tip-Proximal-${coll_suffix}.dae"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="-0.022206 0.041862 -0.000019" rpy="0 0 0"/>
+        <mass value="0.16"/>
+        <inertia
+          ixx="0.000712627094" ixy="0.000121079626" ixz="-4.4573e-08"
+          iyy="0.000666783208" iyz="1.26727e-07"
+          izz="0.001333"/>
+      </inertial>
+    </link>
+
+    <gazebo reference="link_wingtip_proximal_${name_suffix}">
+      <selfCollide>false</selfCollide>
+    </gazebo>
+
+    <!-- Compliant hinge -->
+    <joint name="joint_wingtip_compliance_${name_suffix}" type="revolute">
+      <parent link="link_wingtip_proximal_${name_suffix}"/>
+      <child  link="link_wingtip_${name_suffix}"/>
+      <origin xyz="0 ${prox_len_y} 0" rpy="0 0 0"/>
+      <axis xyz="${side*tip_axis_x} ${side*tip_axis_y} 0"/>
+      <limit lower="${-tip_limit_rad}" upper="${tip_limit_rad}"
+             effort="${tip_effort}" velocity="${tip_velocity}"/>
+      <dynamics damping="${tip_damping}" friction="${tip_friction}"/>
+    </joint>
+
+    <!-- Wingtip distal -->
+    <link name="link_wingtip_${name_suffix}">
+      <visual>
+        <origin xyz="-0.1571 -0.615 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/visual/wing-4-${name_suffix}.stl"/>
+        </geometry>
+        <material name="silicone_translucent"/>
+      </visual>
+
+      <collision>
+        <origin xyz="-0.1571 -0.615 0" rpy="${-roll_pi} 0 0"/>
+        <geometry>
+          <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Tip-${coll_suffix}.dae"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="-0.064169 0.071839 -0.00002" rpy="0 0 0"/>
+        <mass value="0.095"/>
+        <inertia
+          ixx="0.001078" ixy="0.000326253513" ixz="-9.9816e-08"
+          iyy="0.000553975458" iyz="1.84891e-07"
+          izz="0.001624"/>
+      </inertial>
+    </link>
+
+    <gazebo reference="link_wingtip_${name_suffix}">
+      <selfCollide>false</selfCollide>
+    </gazebo>
+
+    <!-- Gazebo compliance spring (joint-level) -->
+    <gazebo reference="joint_wingtip_compliance_${name_suffix}">
+      <implicitSpringDamper>true</implicitSpringDamper>
+      <springStiffness>${tip_spring_k}</springStiffness>
+      <springReference>0.0</springReference>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- =========================
+       Instantiate wings (correct lowercase left/right)
+       ========================= -->
+  <xacro:wing side="1"  roll_pi="0.0"   name_suffix="left"/>
+  <xacro:wing side="-1" roll_pi="${pi}" name_suffix="right"/>
+
+  <!-- =========================
+       Tail
+       ========================= -->
+  <joint name="joint_tail_left" type="revolute">
+    <parent link="base_link"/>
+    <child  link="link_tail_left"/>
+    <origin xyz="${tail_root_x} ${ tail_root_y} 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${-pitch_limit_rad}" upper="${pitch_limit_rad}" effort="10.0" velocity="2.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <link name="link_tail_left">
+    <visual>
+      <origin xyz="0.25 -0.07 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mobula_auv_description/meshes/visual/tail-left.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0.25 -0.07 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Tail-Left.dae"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="-0.085681 0.012104 -0.000003" rpy="0 0 0"/>
+      <mass value="0.375382"/>
+      <inertia
+        ixx="0.000659579492" ixy="9.720846e-06" ixz="2.00641e-07"
+        iyy="0.005407" iyz="7.0887e-08"
+        izz="0.006019"/>
+    </inertial>
+  </link>
+
+  <gazebo reference="link_tail_left">
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+  <joint name="joint_tail_right" type="revolute">
+    <parent link="base_link"/>
+    <child  link="link_tail_right"/>
+    <origin xyz="${tail_root_x} ${-tail_root_y} 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="${-pitch_limit_rad}" upper="${pitch_limit_rad}" effort="10.0" velocity="2.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <link name="link_tail_right">
+    <visual>
+      <origin xyz="0.25 0.07 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mobula_auv_description/meshes/visual/tail-right.stl" scale="1 1 1"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0.25 0.07 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mobula_auv_description/meshes/collision/Collision-Tail-Right.dae"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="-0.085681 0.012104 -0.000003" rpy="0 0 0"/>
+      <mass value="0.375382"/>
+      <inertia
+        ixx="0.000659579492" ixy="9.720846e-06" ixz="2.00641e-07"
+        iyy="0.005407" iyz="7.0887e-08"
+        izz="0.006019"/>
+    </inertial>
+  </link>
+
+  <gazebo reference="link_tail_right">
+    <selfCollide>false</selfCollide>
+  </gazebo>
+
+</robot>
+
+<!-- ros2 launch urdf_tutorial display.launch.py model:=/home/b/manta-c.urdf.xacro -->
+<!-- ros2 launch mobula_auv_description display.launch.xml -->
+
