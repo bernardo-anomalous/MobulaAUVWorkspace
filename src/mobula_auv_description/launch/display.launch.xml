@@ -13,3 +13,8 @@
            args="-d $(var rviz_config_path)"/>
         
 </launch>
+
+<!-- ros2 launch urdf_tutorial display.launch.py model:=/home/b/manta-c.urdf.xacro -->
+<!-- ros2 launch mobula_auv_description display.launch.xml -->
+<!-- ros2 launch ros_gz_sim gz_sim.launch.py gz_args:="empty.sdf -r" -->
+ <!--ros2 run ros_gz_sim create -topic robot_description-->
